@@ -1,0 +1,346 @@
+defmodule DataplaneEx.Indexer.ETS do
+  @moduledoc """
+  In-memory ETS-backed implementation of the Dataplane Indexer.
+
+  Stores the social graph, posts, and feeds in six named ETS tables:
+
+    - `:social_graph_users`           — `:set` of `{user_id}`
+    - `:social_graph_followers`        — `:duplicate_bag` of `{subject_id, actor_id}`
+    - `:social_graph_following`        — `:duplicate_bag` of `{actor_id, subject_id}`
+    - `:social_graph_posts`            — `:set` of `{post_id, author_id}` (`:public`, concurrent writes, concurrent reads)
+    - `:social_graph_feeds`            — `:duplicate_bag` of `{user_id, post_id}` (`:public`, concurrent writes)
+    - `:social_graph_celebrity_posts`  — `:duplicate_bag` of `{author_id, post_id}` (`:public`, concurrent writes)
+
+  The social graph tables are `:protected` (owner writes, everyone reads).
+  The posts table is `:public` with `write_concurrency: :auto` so that
+  Server workers can insert posts without going through the GenServer.
+
+  Post IDs are generated via an `:atomics` counter published in
+  `:persistent_term` for lock-free access from any process.
+  """
+  use GenServer
+
+  @behaviour DataplaneEx.Indexer
+
+  @users_table :social_graph_users
+  @followers_table :social_graph_followers
+  @following_table :social_graph_following
+  @posts_table :social_graph_posts
+  @feeds_table :social_graph_feeds
+  @celebrity_posts_table :social_graph_celebrity_posts
+  @post_id_counter_key :social_graph_post_id_counter
+  @posts_planned_counter_key :social_graph_posts_planned_counter
+
+  # ---------------------------------------------------------------------------
+  # Client API (Indexer behaviour)
+  # ---------------------------------------------------------------------------
+
+  @supported_options MapSet.new([:fan_out_limit])
+  @config_key :indexer_ets_config
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @impl DataplaneEx.Indexer
+  def init do
+    case start_link() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  @impl DataplaneEx.Indexer
+  def configure(opts) do
+    DataplaneEx.Indexer.validate_options!(opts, @supported_options)
+    :persistent_term.put(@config_key, Map.new(opts))
+    DataplaneEx.Indexer.register_active(__MODULE__)
+    init()
+  end
+
+  defp fan_out_limit do
+    case :persistent_term.get(@config_key, nil) do
+      %{fan_out_limit: limit} -> limit
+      _ -> :infinity
+    end
+  end
+
+  @impl DataplaneEx.Indexer
+  def bulk_users(filepath) do
+    GenServer.call(__MODULE__, {:bulk_users, filepath}, :infinity)
+  end
+
+  @impl DataplaneEx.Indexer
+  def bulk_follows(filepath) do
+    GenServer.call(__MODULE__, {:bulk_follows, filepath}, :infinity)
+  end
+
+  @impl DataplaneEx.Indexer
+  def bulk_load_posts(filepath, _opts \\ []) do
+    GenServer.call(__MODULE__, {:bulk_load_posts, filepath}, :infinity)
+  end
+
+  @impl DataplaneEx.Indexer
+  def vacuum do
+    GenServer.call(__MODULE__, :vacuum)
+  end
+
+  @impl DataplaneEx.Indexer
+  def count_users do
+    :ets.info(@users_table, :size)
+  end
+
+  @impl DataplaneEx.Indexer
+  def count_follows do
+    :ets.info(@following_table, :size)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Read helpers (Indexer behaviour + available to the Server / anyone)
+  # ---------------------------------------------------------------------------
+
+  @impl DataplaneEx.Indexer
+  def followers(user_id) do
+    @followers_table
+    |> :ets.lookup(user_id)
+    |> Enum.map(&elem(&1, 1))
+  end
+
+  @impl DataplaneEx.Indexer
+  def create_post(%{user_id: user_id}) do
+    :atomics.add(:persistent_term.get(@posts_planned_counter_key), 1, 1)
+    post_id = next_post_id()
+    insert_post(post_id, user_id)
+    :ok
+  end
+
+  @impl DataplaneEx.Indexer
+  def toggle_follow(%{actor_id: actor_id, subject_id: subject_id}) do
+    do_toggle_follow(actor_id, subject_id)
+    :ok
+  end
+
+  defp do_toggle_follow(actor_id, subject_id) do
+    pair = {actor_id, subject_id}
+
+    exists? =
+      @following_table
+      |> :ets.lookup(actor_id)
+      |> Enum.any?(fn entry -> entry == pair end)
+
+    if exists? do
+      :ets.delete_object(@following_table, pair)
+      :ets.delete_object(@followers_table, {subject_id, actor_id})
+    else
+      :ets.insert(@following_table, pair)
+      :ets.insert(@followers_table, {subject_id, actor_id})
+    end
+  end
+
+  @impl DataplaneEx.Indexer
+  def posts_planned do
+    :atomics.get(:persistent_term.get(@posts_planned_counter_key), 1)
+  end
+
+  @impl DataplaneEx.Indexer
+  def posts_created do
+    :ets.info(@posts_table, :size)
+  end
+
+  @impl DataplaneEx.Indexer
+  def following(user_id) do
+    @following_table
+    |> :ets.lookup(user_id)
+    |> Enum.map(&elem(&1, 1))
+  end
+
+  @doc "Check whether `user_id` exists in the users table."
+  def user_exists?(user_id) do
+    :ets.member(@users_table, user_id)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Posts helpers (ETS-specific, lock-free, callable from any process)
+  # ---------------------------------------------------------------------------
+
+  @doc "Generate and return the next unique post ID (atomics, lock-free)."
+  def next_post_id do
+    :atomics.add_get(:persistent_term.get(@post_id_counter_key), 1, 1)
+  end
+
+  @doc """
+  Insert a post and fan it out to the feeds of all the author's followers.
+
+  When `fan_out_limit` is configured, authors whose follower count exceeds
+  the limit are stored in the `celebrity_posts` table instead of being
+  fanned out. These posts are merged at read time in `get_timeline/1`.
+  """
+  def insert_post(post_id, author_id) do
+    :ets.insert(@posts_table, {post_id, author_id})
+
+    follower_entries = :ets.lookup(@followers_table, author_id)
+    limit = fan_out_limit()
+
+    if limit == :infinity or length(follower_entries) <= limit do
+      Enum.each(follower_entries, fn {_subject, follower_id} ->
+        :ets.insert(@feeds_table, {follower_id, post_id})
+      end)
+    else
+      :ets.insert(@celebrity_posts_table, {author_id, post_id})
+    end
+  end
+
+  @doc "Add a post to a user's feed."
+  def insert_feed_entry(user_id, post_id) do
+    :ets.insert(@feeds_table, {user_id, post_id})
+  end
+
+  @doc """
+  Return the list of post IDs in a user's feed.
+
+  Merges the fan-out feed with any celebrity posts authored by users
+  that `user_id` follows.
+  """
+  def get_timeline(user_id) do
+    fan_out_posts =
+      @feeds_table
+      |> :ets.lookup(user_id)
+      |> Enum.map(&elem(&1, 1))
+
+    celebrity_posts =
+      @following_table
+      |> :ets.lookup(user_id)
+      |> Enum.flat_map(fn {_actor, followed_id} ->
+        :ets.lookup(@celebrity_posts_table, followed_id)
+      end)
+      |> Enum.map(&elem(&1, 1))
+
+    fan_out_posts ++ celebrity_posts
+  end
+
+  # ---------------------------------------------------------------------------
+  # Table name accessors (useful for tests / introspection)
+  # ---------------------------------------------------------------------------
+
+  def users_table, do: @users_table
+  def followers_table, do: @followers_table
+  def following_table, do: @following_table
+  def posts_table, do: @posts_table
+  def feeds_table, do: @feeds_table
+  def celebrity_posts_table, do: @celebrity_posts_table
+
+  # ---------------------------------------------------------------------------
+  # GenServer callbacks
+  # ---------------------------------------------------------------------------
+
+  @impl GenServer
+  def init(_opts) do
+    :ets.new(@users_table, [:set, :named_table, :protected, read_concurrency: true])
+
+    :ets.new(@followers_table, [
+      :duplicate_bag,
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
+
+    :ets.new(@following_table, [
+      :duplicate_bag,
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
+
+    :ets.new(@posts_table, [
+      :set,
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true,
+      decentralized_counters: true
+    ])
+
+    :ets.new(@feeds_table, [
+      :duplicate_bag,
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true,
+      decentralized_counters: true
+    ])
+
+    :ets.new(@celebrity_posts_table, [
+      :duplicate_bag,
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true,
+      decentralized_counters: true
+    ])
+
+    counter = :atomics.new(1, signed: false)
+    :persistent_term.put(@post_id_counter_key, counter)
+
+    planned_counter = :atomics.new(1, signed: false)
+    :persistent_term.put(@posts_planned_counter_key, planned_counter)
+
+    {:ok, %{}}
+  end
+
+  @impl GenServer
+  def handle_call({:bulk_users, filepath}, _from, state) do
+    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+
+    filepath
+    |> DataplaneEx.CSV.parse_users()
+    |> DataplaneEx.Progress.each_with_progress(total, "Loading users", fn user_id ->
+      :ets.insert(@users_table, {user_id})
+    end)
+
+    {:reply, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_call({:bulk_follows, filepath}, _from, state) do
+    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+
+    filepath
+    |> DataplaneEx.CSV.parse_edges()
+    |> DataplaneEx.Progress.each_with_progress(total, "Loading follows", fn {actor_id, subject_id} ->
+      :ets.insert(@followers_table, {subject_id, actor_id})
+      :ets.insert(@following_table, {actor_id, subject_id})
+    end)
+
+    {:reply, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_call({:bulk_load_posts, filepath}, _from, state) do
+    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+
+    filepath
+    |> DataplaneEx.CSV.parse_posts()
+    |> DataplaneEx.Progress.each_with_progress(total, "Loading posts", fn {_offset_ms, user_id} ->
+      insert_post(next_post_id(), user_id)
+    end)
+
+    {:reply, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_call(:vacuum, _from, state) do
+    :ets.delete_all_objects(@users_table)
+    :ets.delete_all_objects(@followers_table)
+    :ets.delete_all_objects(@following_table)
+    :ets.delete_all_objects(@posts_table)
+    :ets.delete_all_objects(@feeds_table)
+    :ets.delete_all_objects(@celebrity_posts_table)
+    :atomics.put(:persistent_term.get(@post_id_counter_key), 1, 0)
+    :atomics.put(:persistent_term.get(@posts_planned_counter_key), 1, 0)
+
+    {:reply, :ok, state}
+  end
+end

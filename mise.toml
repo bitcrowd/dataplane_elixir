@@ -1,0 +1,10 @@
+[tools]
+elixir = "1.19.5-otp-28"
+erlang = "28.4.2"
+
+[env]
+BSKY_DB_POSTGRES_URL = "postgres://postgres:postgres@localhost:5432/dataplane"
+BSKY_DB_POSTGRES_SCHEMA = "bsky"
+BSKY_DATAPLANE_PORT = 2585
+BSKY_RELAY_WEBSOCKET = "ws://localhost:4000"
+BSKY_DID_PLC_URL = "http://localhost:4001"
