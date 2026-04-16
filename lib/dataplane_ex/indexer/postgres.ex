@@ -1,6 +1,8 @@
 defmodule DataplaneEx.Indexer.Postgres do
   @behaviour DataplaneEx.Indexer
 
+  use GenServer
+
   require Logger
   import Ecto.Query
 
@@ -15,17 +17,20 @@ defmodule DataplaneEx.Indexer.Postgres do
     Application.get_env(:dataplane_ex, :write_repo, DataplaneEx.WriteRepo)
   end
 
-  @impl true
-  def init, do: :ok
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
 
-  @impl true
-  def configure(opts) do
+  @impl GenServer
+  def init(opts) do
+    Phoenix.PubSub.subscribe(DataplaneEx.PubSub, "firehose")
+
     DataplaneEx.Indexer.validate_options!(opts, @supported_options)
-    init()
     :persistent_term.put(@config_key, Map.new(opts))
     ensure_posts_planned_counter()
     DataplaneEx.Indexer.register_active(__MODULE__)
-    :ok
+
+    {:ok, %{}}
   end
 
   defp ensure_posts_planned_counter do
@@ -100,7 +105,9 @@ defmodule DataplaneEx.Indexer.Postgres do
     Ecto.Adapters.SQL.query!(
       write_repo(),
       "DROP INDEX IF EXISTS follows_actor_id_subject_id_index",
-      [], timeout: :infinity)
+      [],
+      timeout: :infinity
+    )
 
     Ecto.Adapters.SQL.query!(write_repo(), "DROP INDEX IF EXISTS follows_subject_id_index", [],
       timeout: :infinity
@@ -162,7 +169,9 @@ defmodule DataplaneEx.Indexer.Postgres do
       "Loading posts",
       fn batch ->
         write_repo().insert_all("posts", batch)
-      end, step: batch_size())
+      end,
+      step: batch_size()
+    )
 
     :ok
   end
@@ -252,5 +261,36 @@ defmodule DataplaneEx.Indexer.Postgres do
   @impl true
   def posts_created do
     Repo.aggregate("posts", :count)
+  end
+
+  @impl GenServer
+  def handle_info({:binary, binary}, state) do
+    events =
+      binary
+      |> DataplaneEx.ATProto.Event.decode()
+      |> List.wrap()
+
+    Enum.each(events, &index_event/1)
+
+    {:noreply, state}
+  end
+
+  defp index_event(%{kind: :commit} = event) do
+    case event do
+      %{did: did, commit: %{collection: "app.bsky.feed.post"}} ->
+        create_post(%{user_id: did})
+
+      %{did: did, commit: %{collection: "app.bsky.graph.follow", record: %{"subject" => subject}}} ->
+        toggle_follow(%{actor_id: did, subject_id: subject})
+
+      _other ->
+        Logger.debug("unhandled commit event: #{event}")
+        :ok
+    end
+  end
+
+  defp index_event(event) do
+    Logger.debug("unhandled event: #{event}")
+    :ok
   end
 end

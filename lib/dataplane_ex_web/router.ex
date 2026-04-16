@@ -23,7 +23,7 @@ defmodule DataplaneExWeb.Router do
   scope "/", DataplaneExWeb do
     pipe_through :api
 
-    get "/bsky.Service/GetTimeline", TimelineController, :show
+    post "/bsky.Service/GetTimeline", TimelineController, :timeline
   end
 
   # Other scopes may use custom stacks.

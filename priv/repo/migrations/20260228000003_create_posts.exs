@@ -4,7 +4,7 @@ defmodule DataplaneEx.Repo.Migrations.CreatePosts do
   def change do
     create table(:posts, primary_key: false) do
       add :id, :bigint, primary_key: true
-      add :author_id, references(:users, type: :bigint), null: false
+      add :author_id, references(:users, type: :string), null: false
       timestamps(updated_at: false)
     end
 

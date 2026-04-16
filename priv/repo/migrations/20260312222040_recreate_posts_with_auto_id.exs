@@ -3,7 +3,7 @@ defmodule DataplaneEx.Repo.Migrations.RecreatePostsWithAutoId do
 
   def change do
     create table(:posts) do
-      add :author_id, references(:users, type: :bigint), null: false
+      add :author_id, references(:users, type: :string), null: false
       timestamps(updated_at: false)
     end
 

@@ -12,9 +12,9 @@ defmodule DataplaneEx.Application do
         DataplaneExWeb.Telemetry,
         DataplaneEx.Repo,
         DataplaneEx.WriteRepo,
-        dataplane_indexer(),
         {DNSCluster, query: Application.get_env(:dataplane_ex, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: DataplaneEx.PubSub},
+        dataplane_indexer(),
         DataplaneExWeb.Endpoint
       ]
       |> Enum.reject(&is_nil/1)
@@ -24,8 +24,7 @@ defmodule DataplaneEx.Application do
         children ++
           [
             {DataplaneEx.SyncClient,
-             uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos",
-             name: {:local, :simulator}}
+             uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos", name: {:local, :simulator}}
           ]
       else
         children

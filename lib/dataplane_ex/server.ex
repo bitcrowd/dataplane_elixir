@@ -7,7 +7,8 @@ defmodule DataplaneEx.Server do
   configured, allowing apples-to-apples performance comparison.
   """
 
-  @type timeline_request :: {user_id :: pos_integer(), limit :: pos_integer(), cursor :: term()}
+  @type user_id :: String.t()
+  @type timeline_request :: {user_id(), limit :: pos_integer(), cursor :: term()}
   @type timeline_entry :: map()
   @type timeline_response :: {:ok, [timeline_entry()]} | {:error, term()}
 

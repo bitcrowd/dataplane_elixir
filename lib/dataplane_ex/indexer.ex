@@ -6,18 +6,18 @@ defmodule DataplaneEx.Indexer do
   graphs, vacuuming tables, etc. The query path lives in `Dataplane.Server`.
   """
 
-  @callback init() :: :ok | {:error, term()}
-  @callback configure(opts :: keyword()) :: :ok
   @callback bulk_users(filepath :: String.t()) :: :ok | {:error, term()}
   @callback bulk_follows(filepath :: String.t()) :: :ok | {:error, term()}
   @callback bulk_load_posts(filepath :: String.t(), opts :: keyword()) :: :ok | {:error, term()}
   @callback vacuum() :: :ok
   @callback count_users() :: non_neg_integer()
   @callback count_follows() :: non_neg_integer()
-  @callback followers(user_id :: pos_integer()) :: [pos_integer()]
-  @callback following(user_id :: pos_integer()) :: [pos_integer()]
-  @callback create_post(%{user_id: pos_integer()}) :: :ok | {:error, term()}
-  @callback toggle_follow(%{actor_id: pos_integer(), subject_id: pos_integer()}) ::
+  @type user_id :: String.t()
+
+  @callback followers(user_id()) :: [user_id()]
+  @callback following(user_id()) :: [user_id()]
+  @callback create_post(%{user_id: user_id()}) :: :ok | {:error, term()}
+  @callback toggle_follow(%{actor_id: user_id(), subject_id: user_id()}) ::
               :ok | {:error, term()}
   @callback posts_planned() :: non_neg_integer()
   @callback posts_created() :: non_neg_integer()

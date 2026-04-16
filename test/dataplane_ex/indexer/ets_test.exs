@@ -7,47 +7,42 @@ defmodule DataplaneEx.Indexer.ETSTest do
     users_path = tmp_path("users")
     edges_path = tmp_path("edges")
 
+    did1 = "did:plc:firesim1"
+    did2 = "did:plc:firesim2"
+    did3 = "did:plc:firesim3"
+    did4 = "did:plc:firesim4"
+
     File.write!(users_path, """
-    user_id,follower_count,followers...
-    1,3,2,3,4
-    2,1,3
-    3,0
-    4,0
+    user_did,indexedAt,trustedVerifier
+    #{did1},20260303,false
+    #{did2},20260303,false
+    #{did3},20260303,false
+    #{did4},20260303,false
     """)
 
     File.write!(edges_path, """
-    actor_id,subject_id
-    2,1
-    3,1
-    4,1
-    3,2
+    uri,cid,actor_did,subject_did
+    at://something,bayfreixx,#{did2},#{did1}
+    at://something,bayfreixx,#{did3},#{did1}
+    at://something,bayfreixx,#{did4},#{did1}
+    at://something,bayfreixx,#{did3},#{did2}
     """)
 
-    start_supervised!(Indexer)
-    Indexer.configure([])
+    start_supervised!({Indexer, fan_out_limit: 2})
 
     on_exit(fn ->
       File.rm(users_path)
       File.rm(edges_path)
     end)
 
-    %{users_path: users_path, edges_path: edges_path}
-  end
-
-  describe "configure/1" do
-    test "accepts empty options" do
-      assert :ok = Indexer.configure([])
-    end
-
-    test "accepts fan_out_limit option" do
-      assert :ok = Indexer.configure(fan_out_limit: 100)
-    end
-
-    test "raises on unsupported options" do
-      assert_raise ArgumentError, ~r/unsupported indexer options/, fn ->
-        Indexer.configure(batch_size: 100)
-      end
-    end
+    %{
+      users_path: users_path,
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
+    }
   end
 
   describe "bulk_users/1" do
@@ -65,24 +60,38 @@ defmodule DataplaneEx.Indexer.ETSTest do
       assert Indexer.count_follows() == 4
     end
 
-    test "populates followers table correctly", %{users_path: users_path, edges_path: edges_path} do
+    test "populates followers table correctly", %{
+      users_path: users_path,
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
+    } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert Enum.sort(Indexer.followers(1)) == [2, 3, 4]
-      assert Indexer.followers(2) == [3]
-      assert Indexer.followers(3) == []
-      assert Indexer.followers(4) == []
+      assert Enum.sort(Indexer.followers(did1)) == [did2, did3, did4]
+      assert Indexer.followers(did2) == [did3]
+      assert Indexer.followers(did3) == []
+      assert Indexer.followers(did4) == []
     end
 
-    test "populates following table correctly", %{users_path: users_path, edges_path: edges_path} do
+    test "populates following table correctly", %{
+      users_path: users_path,
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
+    } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert Indexer.following(1) == []
-      assert Indexer.following(2) == [1]
-      assert Enum.sort(Indexer.following(3)) == [1, 2]
-      assert Indexer.following(4) == [1]
+      assert Indexer.following(did1) == []
+      assert Indexer.following(did2) == [did1]
+      assert Enum.sort(Indexer.following(did3)) == [did1, did2]
+      assert Indexer.following(did4) == [did1]
     end
   end
 
@@ -95,9 +104,9 @@ defmodule DataplaneEx.Indexer.ETSTest do
 
       File.write!(posts_path, """
       offset_ms,user_id
-      0,1
-      1000,2
-      5000,1
+      0,did:plc:firesim1
+      1000,did:plc:firesim2
+      5000,did:plc:firesim1
       """)
 
       on_exit(fn -> File.rm(posts_path) end)
@@ -113,8 +122,8 @@ defmodule DataplaneEx.Indexer.ETSTest do
     test "fans out posts to followers' feeds", %{posts_path: posts_path} do
       Indexer.bulk_load_posts(posts_path)
 
-      timeline_2 = Indexer.get_timeline(2)
-      timeline_3 = Indexer.get_timeline(3)
+      timeline_2 = Indexer.get_timeline("did:plc:firesim2")
+      timeline_3 = Indexer.get_timeline("did:plc:firesim3")
 
       assert length(timeline_2) == 2
       assert length(timeline_3) == 3
@@ -137,38 +146,40 @@ defmodule DataplaneEx.Indexer.ETSTest do
 
   describe "toggle_follow/1" do
     test "toggles an existing relationship off and then on",
-         %{users_path: users_path, edges_path: edges_path} do
+         %{users_path: users_path, edges_path: edges_path, did1: did1, did2: did2} do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert Indexer.following(2) == [1]
-      assert :ok = Indexer.toggle_follow(%{actor_id: 2, subject_id: 1})
-      assert Indexer.following(2) == []
-      assert Enum.sort(Indexer.followers(1)) == [3, 4]
+      assert Indexer.following(did2) == [did1]
+      assert :ok = Indexer.toggle_follow(%{actor_id: did2, subject_id: did1})
+      assert Indexer.following(did2) == []
+      assert Enum.sort(Indexer.followers(did1)) == ["did:plc:firesim3", "did:plc:firesim4"]
 
-      assert :ok = Indexer.toggle_follow(%{actor_id: 2, subject_id: 1})
-      assert Indexer.following(2) == [1]
-      assert Enum.sort(Indexer.followers(1)) == [2, 3, 4]
+      assert :ok = Indexer.toggle_follow(%{actor_id: did2, subject_id: did1})
+      assert Indexer.following(did2) == [did1]
+      assert Enum.sort(Indexer.followers(did1)) == [did2, "did:plc:firesim3", "did:plc:firesim4"]
     end
   end
 
   describe "vacuum/0" do
     test "removes all data and resets post counter", %{
       users_path: users_path,
-      edges_path: edges_path
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2
     } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
-      Indexer.insert_post(Indexer.next_post_id(), 1)
-      Indexer.insert_post(Indexer.next_post_id(), 2)
+      Indexer.insert_post(Indexer.next_post_id(), did1)
+      Indexer.insert_post(Indexer.next_post_id(), did2)
 
       assert :ets.info(Indexer.feeds_table(), :size) > 0
 
       assert :ok = Indexer.vacuum()
       assert Indexer.count_users() == 0
       assert Indexer.count_follows() == 0
-      assert Indexer.followers(1) == []
-      assert Indexer.following(3) == []
+      assert Indexer.followers(did1) == []
+      assert Indexer.following("did:plc:firesim3") == []
       assert :ets.info(Indexer.posts_table(), :size) == 0
       assert :ets.info(Indexer.feeds_table(), :size) == 0
       assert :ets.info(Indexer.celebrity_posts_table(), :size) == 0
@@ -191,30 +202,38 @@ defmodule DataplaneEx.Indexer.ETSTest do
   describe "create_post/1" do
     test "creates a post and fans out to followers", %{
       users_path: users_path,
-      edges_path: edges_path
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
     } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert :ok = Indexer.create_post(%{user_id: 1})
+      assert :ok = Indexer.create_post(%{user_id: did1})
 
-      assert length(Indexer.get_timeline(2)) == 1
-      assert length(Indexer.get_timeline(3)) == 1
-      assert length(Indexer.get_timeline(4)) == 1
+      assert length(Indexer.get_timeline(did2)) == 1
+      assert length(Indexer.get_timeline(did3)) == 1
+      assert length(Indexer.get_timeline(did4)) == 1
     end
 
     test "returns :ok for user with no followers", %{
       users_path: users_path,
-      edges_path: edges_path
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
     } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert :ok = Indexer.create_post(%{user_id: 4})
+      assert :ok = Indexer.create_post(%{user_id: did4})
 
-      assert Indexer.get_timeline(1) == []
-      assert Indexer.get_timeline(2) == []
-      assert Indexer.get_timeline(3) == []
+      assert Indexer.get_timeline(did1) == []
+      assert Indexer.get_timeline(did2) == []
+      assert Indexer.get_timeline(did3) == []
     end
   end
 
@@ -243,34 +262,45 @@ defmodule DataplaneEx.Indexer.ETSTest do
       assert :ets.info(Indexer.posts_table(), :size) == 5
     end
 
-    test "fans out to followers' feeds", %{users_path: users_path, edges_path: edges_path} do
+    test "fans out to followers' feeds", %{
+      users_path: users_path,
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
+    } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
       p1 = Indexer.next_post_id()
-      Indexer.insert_post(p1, 1)
+      Indexer.insert_post(p1, did1)
 
-      assert Enum.sort(Indexer.get_timeline(2)) == [p1]
-      assert Enum.sort(Indexer.get_timeline(3)) == [p1]
-      assert Enum.sort(Indexer.get_timeline(4)) == [p1]
-      assert Indexer.get_timeline(1) == []
+      assert Enum.sort(Indexer.get_timeline(did2)) == [p1]
+      assert Enum.sort(Indexer.get_timeline(did3)) == [p1]
+      assert Enum.sort(Indexer.get_timeline(did4)) == [p1]
+      assert Indexer.get_timeline(did1) == []
     end
 
     test "fans out to correct followers for different authors", %{
       users_path: users_path,
-      edges_path: edges_path
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
     } do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
       p1 = Indexer.next_post_id()
       p2 = Indexer.next_post_id()
-      Indexer.insert_post(p1, 1)
-      Indexer.insert_post(p2, 2)
+      Indexer.insert_post(p1, did1)
+      Indexer.insert_post(p2, did2)
 
-      assert Enum.sort(Indexer.get_timeline(3)) == Enum.sort([p1, p2])
-      assert Indexer.get_timeline(4) == [p1]
-      assert Indexer.get_timeline(2) == [p1]
+      assert Enum.sort(Indexer.get_timeline(did3)) == Enum.sort([p1, p2])
+      assert Indexer.get_timeline(did4) == [p1]
+      assert Indexer.get_timeline(did2) == [p1]
     end
 
     test "no fan-out when author has no followers" do
@@ -282,46 +312,52 @@ defmodule DataplaneEx.Indexer.ETSTest do
     test "skips fan-out and stores in celebrity_posts when follower count exceeds fan_out_limit",
          %{
            users_path: users_path,
-           edges_path: edges_path
+           edges_path: edges_path,
+           did1: did1
          } do
-      Indexer.configure(fan_out_limit: 2)
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
       post_id = Indexer.next_post_id()
-      Indexer.insert_post(post_id, 1)
+      Indexer.insert_post(post_id, did1)
 
       assert :ets.info(Indexer.feeds_table(), :size) == 0
       assert :ets.info(Indexer.posts_table(), :size) == 1
-      assert [{1, ^post_id}] = :ets.lookup(Indexer.celebrity_posts_table(), 1)
+      assert [{^did1, ^post_id}] = :ets.lookup(Indexer.celebrity_posts_table(), did1)
     end
 
     test "allows fan-out when follower count is within fan_out_limit", %{
       users_path: users_path,
-      edges_path: edges_path
+      edges_path: edges_path,
+      did2: did2,
+      did3: did3
     } do
-      Indexer.configure(fan_out_limit: 2)
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
       # User 2 has 1 follower — within limit, fan-out happens
       post_id = Indexer.next_post_id()
-      Indexer.insert_post(post_id, 2)
-      assert Indexer.get_timeline(3) == [post_id]
+      Indexer.insert_post(post_id, did2)
+      assert Indexer.get_timeline(did3) == [post_id]
     end
 
     test "fan-out works normally when fan_out_limit is not configured", %{
       users_path: users_path,
-      edges_path: edges_path
+      edges_path: edges_path,
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
     } do
-      Indexer.configure([])
+      :persistent_term.put(:indexer_ets_config, %{})
+
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      Indexer.insert_post(Indexer.next_post_id(), 1)
-      assert length(Indexer.get_timeline(2)) == 1
-      assert length(Indexer.get_timeline(3)) == 1
-      assert length(Indexer.get_timeline(4)) == 1
+      Indexer.insert_post(Indexer.next_post_id(), did1)
+      assert length(Indexer.get_timeline(did2)) == 1
+      assert length(Indexer.get_timeline(did3)) == 1
+      assert length(Indexer.get_timeline(did4)) == 1
     end
   end
 
@@ -350,48 +386,52 @@ defmodule DataplaneEx.Indexer.ETSTest do
 
   describe "get_timeline/1 with celebrity posts" do
     setup %{users_path: users_path, edges_path: edges_path} do
-      Indexer.configure(fan_out_limit: 2)
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
       :ok
     end
 
-    test "includes celebrity posts from followed authors" do
+    test "includes celebrity posts from followed authors", %{
+      did1: did1,
+      did2: did2,
+      did3: did3,
+      did4: did4
+    } do
       post_id = Indexer.next_post_id()
-      Indexer.insert_post(post_id, 1)
+      Indexer.insert_post(post_id, did1)
 
-      assert Indexer.get_timeline(2) == [post_id]
-      assert Indexer.get_timeline(3) == [post_id]
-      assert Indexer.get_timeline(4) == [post_id]
+      assert Indexer.get_timeline(did2) == [post_id]
+      assert Indexer.get_timeline(did3) == [post_id]
+      assert Indexer.get_timeline(did4) == [post_id]
     end
 
-    test "excludes celebrity posts from non-followed authors" do
-      Indexer.insert_post(Indexer.next_post_id(), 1)
+    test "excludes celebrity posts from non-followed authors", %{did1: did1} do
+      Indexer.insert_post(Indexer.next_post_id(), did1)
 
-      assert Indexer.get_timeline(1) == []
+      assert Indexer.get_timeline(did1) == []
     end
 
-    test "merges fan-out and celebrity posts" do
+    test "merges fan-out and celebrity posts", %{did1: did1, did2: did2, did3: did3} do
       celebrity_post = Indexer.next_post_id()
-      Indexer.insert_post(celebrity_post, 1)
+      Indexer.insert_post(celebrity_post, did1)
 
       normal_post = Indexer.next_post_id()
-      Indexer.insert_post(normal_post, 2)
+      Indexer.insert_post(normal_post, did2)
 
-      assert Enum.sort(Indexer.get_timeline(3)) == Enum.sort([celebrity_post, normal_post])
+      assert Enum.sort(Indexer.get_timeline(did3)) == Enum.sort([celebrity_post, normal_post])
     end
   end
 
   describe "user_exists?/1" do
-    test "returns true for loaded users", %{users_path: path} do
+    test "returns true for loaded users", %{users_path: path, did1: did1, did4: did4} do
       Indexer.bulk_users(path)
 
-      assert Indexer.user_exists?(1)
-      assert Indexer.user_exists?(4)
+      assert Indexer.user_exists?(did1)
+      assert Indexer.user_exists?(did4)
     end
 
     test "returns false for unknown users" do
-      refute Indexer.user_exists?(999)
+      refute Indexer.user_exists?("did:plc:unknown")
     end
   end
 
@@ -412,7 +452,6 @@ defmodule DataplaneEx.Indexer.ETSTest do
     end
 
     test "increments even for celebrity posts", %{users_path: users_path, edges_path: edges_path} do
-      Indexer.configure(fan_out_limit: 2)
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 

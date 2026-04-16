@@ -23,7 +23,7 @@ defmodule DataplaneEx.Indexer.PostgresTest do
     3,2
     """)
 
-    Indexer.configure([])
+    start_supervised!(Indexer)
 
     on_exit(fn ->
       File.rm(users_path)
@@ -31,18 +31,6 @@ defmodule DataplaneEx.Indexer.PostgresTest do
     end)
 
     %{users_path: users_path, edges_path: edges_path}
-  end
-
-  describe "configure/1" do
-    test "accepts supported options" do
-      assert :ok = Indexer.configure(batch_size: 10_000)
-    end
-
-    test "raises on unsupported options" do
-      assert_raise ArgumentError, ~r/unsupported indexer options/, fn ->
-        Indexer.configure(foo: :bar)
-      end
-    end
   end
 
   describe "bulk_users/1" do
@@ -152,10 +140,10 @@ defmodule DataplaneEx.Indexer.PostgresTest do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert Enum.sort(Indexer.followers(1)) == [2, 3, 4]
-      assert Indexer.followers(2) == [3]
-      assert Indexer.followers(3) == []
-      assert Indexer.followers(4) == []
+      assert Enum.sort(Indexer.followers("1")) == ["2", "3", "4"]
+      assert Indexer.followers("2") == ["3"]
+      assert Indexer.followers("3") == []
+      assert Indexer.followers("4") == []
     end
   end
 
@@ -167,10 +155,10 @@ defmodule DataplaneEx.Indexer.PostgresTest do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert Indexer.following(1) == []
-      assert Indexer.following(2) == [1]
-      assert Enum.sort(Indexer.following(3)) == [1, 2]
-      assert Indexer.following(4) == [1]
+      assert Indexer.following("1") == []
+      assert Indexer.following("2") == ["1"]
+      assert Enum.sort(Indexer.following("3")) == ["1", "2"]
+      assert Indexer.following("4") == ["1"]
     end
   end
 
@@ -180,14 +168,14 @@ defmodule DataplaneEx.Indexer.PostgresTest do
       Indexer.bulk_users(users_path)
       Indexer.bulk_follows(edges_path)
 
-      assert Indexer.following(2) == [1]
-      assert :ok = Indexer.toggle_follow(%{actor_id: 2, subject_id: 1})
-      assert Indexer.following(2) == []
-      assert Enum.sort(Indexer.followers(1)) == [3, 4]
+      assert Indexer.following("2") == ["1"]
+      assert :ok = Indexer.toggle_follow(%{actor_id: "2", subject_id: "1"})
+      assert Indexer.following("2") == []
+      assert Enum.sort(Indexer.followers("1")) == ["3", "4"]
 
-      assert :ok = Indexer.toggle_follow(%{actor_id: 2, subject_id: 1})
-      assert Indexer.following(2) == [1]
-      assert Enum.sort(Indexer.followers(1)) == [2, 3, 4]
+      assert :ok = Indexer.toggle_follow(%{actor_id: "2", subject_id: "1"})
+      assert Indexer.following("2") == ["1"]
+      assert Enum.sort(Indexer.followers("1")) == ["2", "3", "4"]
     end
   end
 
@@ -195,15 +183,15 @@ defmodule DataplaneEx.Indexer.PostgresTest do
     test "inserts a post for a valid user", %{users_path: users_path} do
       Indexer.bulk_users(users_path)
 
-      assert :ok = Indexer.create_post(%{user_id: 2})
+      assert :ok = Indexer.create_post(%{user_id: "2"})
 
-      posts = Repo.all(from(p in "posts", where: p.author_id == 2, select: p.id))
+      posts = Repo.all(from(p in "posts", where: p.author_id == "2", select: p.id))
       assert length(posts) > 0
     end
 
     test "raises on foreign key violation for non-existent user" do
       assert_raise Postgrex.Error, fn ->
-        Indexer.create_post(%{user_id: 999_999})
+        Indexer.create_post(%{user_id: "999999"})
       end
     end
   end
@@ -218,16 +206,16 @@ defmodule DataplaneEx.Indexer.PostgresTest do
       Indexer.vacuum()
       Indexer.bulk_users(users_path)
 
-      Indexer.create_post(%{user_id: 1})
+      Indexer.create_post(%{user_id: "1"})
       assert Indexer.posts_planned() == 1
 
-      Indexer.create_post(%{user_id: 2})
+      Indexer.create_post(%{user_id: "2"})
       assert Indexer.posts_planned() == 2
     end
 
     test "resets to 0 after vacuum", %{users_path: users_path} do
       Indexer.bulk_users(users_path)
-      Indexer.create_post(%{user_id: 1})
+      Indexer.create_post(%{user_id: "1"})
       assert Indexer.posts_planned() > 0
 
       Indexer.vacuum()
@@ -243,8 +231,8 @@ defmodule DataplaneEx.Indexer.PostgresTest do
     test "returns the number of posts in the database", %{users_path: users_path} do
       Indexer.bulk_users(users_path)
 
-      Indexer.create_post(%{user_id: 1})
-      Indexer.create_post(%{user_id: 2})
+      Indexer.create_post(%{user_id: "1"})
+      Indexer.create_post(%{user_id: "2"})
 
       assert Indexer.posts_created() == 2
     end
@@ -253,16 +241,16 @@ defmodule DataplaneEx.Indexer.PostgresTest do
       Indexer.vacuum()
       Indexer.bulk_users(users_path)
 
-      Indexer.create_post(%{user_id: 1})
-      Indexer.create_post(%{user_id: 2})
-      Indexer.create_post(%{user_id: 3})
+      Indexer.create_post(%{user_id: "1"})
+      Indexer.create_post(%{user_id: "2"})
+      Indexer.create_post(%{user_id: "3"})
 
       assert Indexer.posts_planned() == Indexer.posts_created()
     end
 
     test "resets to 0 after vacuum", %{users_path: users_path} do
       Indexer.bulk_users(users_path)
-      Indexer.create_post(%{user_id: 1})
+      Indexer.create_post(%{user_id: "1"})
       assert Indexer.posts_created() > 0
 
       Indexer.vacuum()

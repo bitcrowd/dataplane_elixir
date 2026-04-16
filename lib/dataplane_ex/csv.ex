@@ -63,7 +63,8 @@ defmodule DataplaneEx.CSV do
     |> Stream.map(&String.trim/1)
     |> Stream.reject(&(&1 == ""))
     |> Stream.map(fn line ->
-      line |> String.split(",", parts: 2) |> hd() |> String.to_integer()
+      [user_did, _indexed_at, _trusted_verifier] = String.split(line, ",", parts: 3)
+      user_did
     end)
   end
 
@@ -78,8 +79,9 @@ defmodule DataplaneEx.CSV do
     |> Stream.map(&String.trim/1)
     |> Stream.reject(&(&1 == ""))
     |> Stream.map(fn line ->
-      [actor, subject] = String.split(line, ",")
-      {String.to_integer(actor), String.to_integer(subject)}
+      [_uri, _cid, actor_did, subject_did | _rest] = String.split(line, ",")
+
+      {actor_did, subject_did}
     end)
   end
 
@@ -94,8 +96,8 @@ defmodule DataplaneEx.CSV do
     |> Stream.map(&String.trim/1)
     |> Stream.reject(&(&1 == ""))
     |> Stream.map(fn line ->
-      [offset_ms, user_id] = line |> String.split(",") |> Enum.map(&String.to_integer/1)
-      {offset_ms, user_id}
+      [offset_ms, user_id] = line |> String.split(",")
+      {String.to_integer(offset_ms), user_id}
     end)
   end
 end

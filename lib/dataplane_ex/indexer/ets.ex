@@ -20,6 +20,8 @@ defmodule DataplaneEx.Indexer.ETS do
   """
   use GenServer
 
+  require Logger
+
   @behaviour DataplaneEx.Indexer
 
   @users_table :social_graph_users
@@ -40,23 +42,6 @@ defmodule DataplaneEx.Indexer.ETS do
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
-  @impl DataplaneEx.Indexer
-  def init do
-    case start_link() do
-      {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
-      {:error, _} = error -> error
-    end
-  end
-
-  @impl DataplaneEx.Indexer
-  def configure(opts) do
-    DataplaneEx.Indexer.validate_options!(opts, @supported_options)
-    :persistent_term.put(@config_key, Map.new(opts))
-    DataplaneEx.Indexer.register_active(__MODULE__)
-    init()
   end
 
   defp fan_out_limit do
@@ -235,7 +220,13 @@ defmodule DataplaneEx.Indexer.ETS do
   # ---------------------------------------------------------------------------
 
   @impl GenServer
-  def init(_opts) do
+  def init(opts) do
+    Phoenix.PubSub.subscribe(DataplaneEx.PubSub, "firehose")
+
+    DataplaneEx.Indexer.validate_options!(opts, @supported_options)
+    :persistent_term.put(@config_key, Map.new(opts))
+    DataplaneEx.Indexer.register_active(__MODULE__)
+
     :ets.new(@users_table, [:set, :named_table, :protected, read_concurrency: true])
 
     :ets.new(@followers_table, [
@@ -342,5 +333,36 @@ defmodule DataplaneEx.Indexer.ETS do
     :atomics.put(:persistent_term.get(@posts_planned_counter_key), 1, 0)
 
     {:reply, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_info({:binary, binary}, state) do
+    events =
+      binary
+      |> DataplaneEx.ATProto.Event.decode()
+      |> List.wrap()
+
+    Enum.each(events, &index_event/1)
+
+    {:noreply, state}
+  end
+
+  defp index_event(%{kind: :commit} = event) do
+    case event do
+      %{did: did, commit: %{collection: "app.bsky.feed.post"}} ->
+        create_post(%{user_id: did})
+
+      %{did: did, commit: %{collection: "app.bsky.graph.follow", record: %{"subject" => subject}}} ->
+        toggle_follow(%{actor_id: did, subject_id: subject})
+
+      _other ->
+        Logger.debug("unhandled commit event: #{event}")
+        :ok
+    end
+  end
+
+  defp index_event(event) do
+    Logger.debug("unhandled event: #{event}")
+    :ok
   end
 end

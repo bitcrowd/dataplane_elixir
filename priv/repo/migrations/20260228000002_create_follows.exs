@@ -3,8 +3,8 @@ defmodule DataplaneEx.Repo.Migrations.CreateFollows do
 
   def change do
     create table(:follows, primary_key: false) do
-      add :actor_id, references(:users, type: :bigint), null: false
-      add :subject_id, references(:users, type: :bigint), null: false
+      add :actor_id, references(:users, type: :string), null: false
+      add :subject_id, references(:users, type: :string), null: false
     end
 
     create unique_index(:follows, [:actor_id, :subject_id])

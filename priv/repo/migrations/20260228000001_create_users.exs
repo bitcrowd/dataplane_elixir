@@ -3,7 +3,7 @@ defmodule DataplaneEx.Repo.Migrations.CreateUsers do
 
   def change do
     create table(:users, primary_key: false) do
-      add :id, :bigint, primary_key: true
+      add :id, :string, primary_key: true
     end
   end
 end
