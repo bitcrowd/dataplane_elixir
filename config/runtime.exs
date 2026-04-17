@@ -34,9 +34,9 @@ if config_env() == :prod do
   config :dataplane_ex, bsky_relay_websocket: bsky_relay_websocket
 
   database_url =
-    System.get_env("DATABASE_URL") ||
+    System.get_env("BSKY_DB_POSTGRES_URL") ||
       raise """
-      environment variable DATABASE_URL is missing.
+      environment variable BSKY_DB_POSTGRES_URL is missing.
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
