@@ -102,7 +102,7 @@ defmodule DataplaneEx.Progress do
         if final_tuples > 0 do
           rate = rate_string(final_tuples, elapsed_ms)
 
-          IO.write(
+          Logger.info(
             "\r\e[2K#{format_number(final_tuples)} rows — #{rate} — #{format_duration(elapsed_ms)}\n"
           )
         end
@@ -151,7 +151,7 @@ defmodule DataplaneEx.Progress do
               ""
             end
 
-          IO.write(
+          Logger.info(
             "\r\e[2K#{label}: #{format_number(tuples)} rows (#{Float.round(bytes_pct * 100, 1)}%) — #{rate}#{eta}"
           )
         end
@@ -163,7 +163,7 @@ defmodule DataplaneEx.Progress do
   defp wait_or_stop(parent, label, started_at, last_tuples) do
     receive do
       :stop ->
-        IO.write("\r\e[2K")
+        Logger.info("\r\e[2K")
         now = System.monotonic_time(:millisecond)
         send(parent, {:progress_stopped, last_tuples, now - started_at})
     after
@@ -219,7 +219,7 @@ defmodule DataplaneEx.Progress do
   defp index_wait_or_stop(parent, label, started_at, last_progress) do
     receive do
       :stop ->
-        IO.write("\r\e[2K")
+        Logger.info("\r\e[2K")
         now = System.monotonic_time(:millisecond)
         tuples = last_progress[:tuples_done] || 0
         send(parent, {:progress_stopped, tuples, now - started_at})
@@ -254,7 +254,7 @@ defmodule DataplaneEx.Progress do
           ""
       end
 
-    IO.write("\r\e[2K#{label}: #{phase}#{pct_part} — #{format_duration(elapsed)}")
+    Logger.info("\r\e[2K#{label}: #{phase}#{pct_part} — #{format_duration(elapsed)}")
   end
 
   defp query_index_progress do
@@ -291,7 +291,7 @@ defmodule DataplaneEx.Progress do
   defp print_progress(label, count, 0, started_at, now) do
     elapsed = now - started_at
     rate = rate_string(count, elapsed)
-    IO.write("\r\e[2K#{label}: #{format_number(count)} rows — #{rate}")
+    Logger.info("\r\e[2K#{label}: #{format_number(count)} rows — #{rate}")
   end
 
   defp print_progress(label, count, total, started_at, now) do
@@ -307,7 +307,7 @@ defmodule DataplaneEx.Progress do
         ""
       end
 
-    IO.write(
+    Logger.info(
       "\r\e[2K#{label}: #{format_number(count)} / #{format_number(total)} (#{pct}%) — #{rate}#{eta}"
     )
   end
@@ -316,7 +316,7 @@ defmodule DataplaneEx.Progress do
     elapsed = System.monotonic_time(:millisecond) - started_at
     rate = rate_string(count, elapsed)
 
-    IO.write(
+    Logger.info(
       "\r\e[2K#{label}: #{format_number(count)} rows — #{rate} — #{format_duration(elapsed)}\n"
     )
   end
