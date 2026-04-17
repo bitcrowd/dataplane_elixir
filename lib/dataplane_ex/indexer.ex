@@ -6,9 +6,12 @@ defmodule DataplaneEx.Indexer do
   graphs, vacuuming tables, etc. The query path lives in `Dataplane.Server`.
   """
 
-  @callback bulk_users(filepath :: String.t()) :: :ok | {:error, term()}
-  @callback bulk_follows(filepath :: String.t()) :: :ok | {:error, term()}
-  @callback bulk_load_posts(filepath :: String.t(), opts :: keyword()) :: :ok | {:error, term()}
+  @callback bulk_users(source :: String.t() | Enumerable.t(), opts :: keyword()) ::
+              :ok | {:error, term()}
+  @callback bulk_follows(source :: String.t() | Enumerable.t(), opts :: keyword()) ::
+              :ok | {:error, term()}
+  @callback bulk_load_posts(source :: String.t() | Enumerable.t(), opts :: keyword()) ::
+              :ok | {:error, term()}
   @callback vacuum() :: :ok
   @callback count_users() :: non_neg_integer()
   @callback count_follows() :: non_neg_integer()

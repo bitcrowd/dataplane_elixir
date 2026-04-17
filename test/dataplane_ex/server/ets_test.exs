@@ -4,44 +4,16 @@ defmodule DataplaneEx.Server.ETSTest do
   alias DataplaneEx.Server.ETS, as: Server
   alias DataplaneEx.Indexer.ETS, as: Indexer
 
-  @fixtures_dir Path.expand("../../../fixtures", __DIR__)
-
   setup do
-    users_path = Path.join(@fixtures_dir, "server_users.csv")
-    edges_path = Path.join(@fixtures_dir, "server_edges.csv")
-
     did1 = "did:plc:firesim1"
     did2 = "did:plc:firesim2"
     did3 = "did:plc:firesim3"
     did4 = "did:plc:firesim4"
 
-    File.mkdir_p!(@fixtures_dir)
-
-    File.write!(users_path, """
-    user_did,indexedAt,trustedVerifier
-    #{did1},20260303,false
-    #{did2},20260303,false
-    #{did3},20260303,false
-    #{did4},20260303,false
-    """)
-
-    File.write!(edges_path, """
-    uri,cid,actor_did,subject_did
-    at://something,bayfreixx,#{did2},#{did1}
-    at://something,bayfreixx,#{did3},#{did1}
-    at://something,bayfreixx,#{did4},#{did1}
-    at://something,bayfreixx,#{did3},#{did2}
-    """)
-
     start_supervised!(Indexer)
 
-    Indexer.bulk_users(users_path)
-    Indexer.bulk_follows(edges_path)
-
-    on_exit(fn ->
-      File.rm(users_path)
-      File.rm(edges_path)
-    end)
+    Indexer.bulk_users(users_csv(did1, did2, did3, did4))
+    Indexer.bulk_follows(edges_csv(did1, did2, did3, did4))
 
     %{did1: did1, did2: did2, did3: did3, did4: did4}
   end
@@ -84,5 +56,25 @@ defmodule DataplaneEx.Server.ETSTest do
 
       assert ids == Enum.sort(ids, :desc)
     end
+  end
+
+  defp users_csv(did1, did2, did3, did4) do
+    """
+    user_did,indexedAt,trustedVerifier
+    #{did1},20260303,false
+    #{did2},20260303,false
+    #{did3},20260303,false
+    #{did4},20260303,false
+    """
+  end
+
+  defp edges_csv(did1, did2, did3, did4) do
+    """
+    uri,cid,actor_did,subject_did
+    at://something,bayfreixx,#{did2},#{did1}
+    at://something,bayfreixx,#{did3},#{did1}
+    at://something,bayfreixx,#{did4},#{did1}
+    at://something,bayfreixx,#{did3},#{did2}
+    """
   end
 end

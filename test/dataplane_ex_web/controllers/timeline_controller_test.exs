@@ -9,37 +9,16 @@ defmodule DataplaneExWeb.TimelineControllerTest do
     start_supervised!(ETS)
     Application.put_env(:dataplane_ex, :server, DataplaneEx.Server.ETS)
 
-    users_path = tmp_path("users")
-    follows_path = tmp_path("follows")
-
     did1 = "did:plc:firesim1"
     did2 = "did:plc:firesim2"
     did3 = "did:plc:firesim3"
     did4 = "did:plc:firesim4"
 
-    File.write!(users_path, """
-    user_did,indexedAt,trustedVerifier
-    #{did1},20260303,false
-    #{did2},20260303,false
-    #{did3},20260303,false
-    #{did4},20260303,false
-    """)
-
-    File.write!(follows_path, """
-    uri,cid,actor_did,subject_did
-    at://something,bayfreixx,#{did2},#{did1}
-    at://something,bayfreixx,#{did3},#{did1}
-    at://something,bayfreixx,#{did4},#{did1}
-    at://something,bayfreixx,#{did3},#{did2}
-    """)
-
-    :ok = ETS.bulk_users(users_path)
-    :ok = ETS.bulk_follows(follows_path)
+    :ok = ETS.bulk_users(users_csv(did1, did2, did3, did4))
+    :ok = ETS.bulk_follows(follows_csv(did1, did2, did3, did4))
 
     on_exit(fn ->
       Application.delete_env(:dataplane_ex, :server)
-      File.rm(users_path)
-      File.rm(follows_path)
     end)
 
     :ok
@@ -57,10 +36,23 @@ defmodule DataplaneExWeb.TimelineControllerTest do
     assert Enum.map(items, & &1["id"]) == Enum.sort(Enum.map(items, & &1["id"]), :desc)
   end
 
-  defp tmp_path(name) do
-    Path.join(
-      System.tmp_dir!(),
-      "dataplane_ex_timeline_#{name}_#{System.unique_integer([:positive])}.csv"
-    )
+  defp users_csv(did1, did2, did3, did4) do
+    """
+    user_did,indexedAt,trustedVerifier
+    #{did1},20260303,false
+    #{did2},20260303,false
+    #{did3},20260303,false
+    #{did4},20260303,false
+    """
+  end
+
+  defp follows_csv(did1, did2, did3, did4) do
+    """
+    uri,cid,actor_did,subject_did
+    at://something,bayfreixx,#{did2},#{did1}
+    at://something,bayfreixx,#{did3},#{did1}
+    at://something,bayfreixx,#{did4},#{did1}
+    at://something,bayfreixx,#{did3},#{did2}
+    """
   end
 end

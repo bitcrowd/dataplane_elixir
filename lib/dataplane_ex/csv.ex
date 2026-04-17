@@ -56,9 +56,15 @@ defmodule DataplaneEx.CSV do
   Parses a user CSV (`user_id,follower_count,followers...`) into a stream of user IDs.
   """
   @spec parse_users(String.t()) :: Enumerable.t()
-  def parse_users(filepath) do
-    filepath
-    |> File.stream!()
+  def parse_users(content) when is_binary(content) do
+    content
+    |> String.splitter("\n", trim: false)
+    |> parse_users()
+  end
+
+  @spec parse_users(Enumerable.t()) :: Enumerable.t()
+  def parse_users(source) do
+    source
     |> Stream.drop(1)
     |> Stream.map(&String.trim/1)
     |> Stream.reject(&(&1 == ""))
@@ -72,9 +78,15 @@ defmodule DataplaneEx.CSV do
   Parses an edge-list CSV (`actor_id,subject_id`) into a stream of tuples.
   """
   @spec parse_edges(String.t()) :: Enumerable.t()
-  def parse_edges(filepath) do
-    filepath
-    |> File.stream!()
+  def parse_edges(content) when is_binary(content) do
+    content
+    |> String.splitter("\n", trim: false)
+    |> parse_edges()
+  end
+
+  @spec parse_edges(Enumerable.t()) :: Enumerable.t()
+  def parse_edges(source) do
+    source
     |> Stream.drop(1)
     |> Stream.map(&String.trim/1)
     |> Stream.reject(&(&1 == ""))
@@ -89,9 +101,15 @@ defmodule DataplaneEx.CSV do
   Parses a posts CSV (`offset_ms,user_id`) into a stream of `{offset_ms, user_id}` tuples.
   """
   @spec parse_posts(String.t()) :: Enumerable.t()
-  def parse_posts(filepath) do
-    filepath
-    |> File.stream!()
+  def parse_posts(content) when is_binary(content) do
+    content
+    |> String.splitter("\n", trim: false)
+    |> parse_posts()
+  end
+
+  @spec parse_posts(Enumerable.t()) :: Enumerable.t()
+  def parse_posts(source) do
+    source
     |> Stream.drop(1)
     |> Stream.map(&String.trim/1)
     |> Stream.reject(&(&1 == ""))

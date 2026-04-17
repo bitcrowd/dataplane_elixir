@@ -52,18 +52,36 @@ defmodule DataplaneEx.Indexer.ETS do
   end
 
   @impl DataplaneEx.Indexer
-  def bulk_users(filepath) do
-    GenServer.call(__MODULE__, {:bulk_users, filepath}, :infinity)
+  def bulk_users(source, opts \\ []) do
+    GenServer.call(__MODULE__, {:bulk_users, source, opts}, :infinity)
   end
 
   @impl DataplaneEx.Indexer
-  def bulk_follows(filepath) do
-    GenServer.call(__MODULE__, {:bulk_follows, filepath}, :infinity)
+  def bulk_follows(source, opts \\ []) do
+    GenServer.call(__MODULE__, {:bulk_follows, source, opts}, :infinity)
   end
 
   @impl DataplaneEx.Indexer
-  def bulk_load_posts(filepath, _opts \\ []) do
-    GenServer.call(__MODULE__, {:bulk_load_posts, filepath}, :infinity)
+  def bulk_load_posts(source, opts \\ []) do
+    GenServer.call(__MODULE__, {:bulk_load_posts, source, opts}, :infinity)
+  end
+
+  def bulk_users_from_file(path, opts \\ []) do
+    path
+    |> File.stream!()
+    |> bulk_users(Keyword.put_new(opts, :total, total_from_file(path)))
+  end
+
+  def bulk_follows_from_file(path, opts \\ []) do
+    path
+    |> File.stream!()
+    |> bulk_follows(Keyword.put_new(opts, :total, total_from_file(path)))
+  end
+
+  def bulk_load_posts_from_file(path, opts \\ []) do
+    path
+    |> File.stream!()
+    |> bulk_load_posts(Keyword.put_new(opts, :total, total_from_file(path)))
   end
 
   @impl DataplaneEx.Indexer
@@ -282,10 +300,10 @@ defmodule DataplaneEx.Indexer.ETS do
   end
 
   @impl GenServer
-  def handle_call({:bulk_users, filepath}, _from, state) do
-    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+  def handle_call({:bulk_users, source, opts}, _from, state) do
+    total = total_from_source(source, opts)
 
-    filepath
+    source
     |> DataplaneEx.CSV.parse_users()
     |> DataplaneEx.Progress.each_with_progress(total, "Loading users", fn user_id ->
       :ets.insert(@users_table, {user_id})
@@ -295,10 +313,10 @@ defmodule DataplaneEx.Indexer.ETS do
   end
 
   @impl GenServer
-  def handle_call({:bulk_follows, filepath}, _from, state) do
-    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+  def handle_call({:bulk_follows, source, opts}, _from, state) do
+    total = total_from_source(source, opts)
 
-    filepath
+    source
     |> DataplaneEx.CSV.parse_edges()
     |> DataplaneEx.Progress.each_with_progress(total, "Loading follows", fn {actor_id, subject_id} ->
       :ets.insert(@followers_table, {subject_id, actor_id})
@@ -309,10 +327,10 @@ defmodule DataplaneEx.Indexer.ETS do
   end
 
   @impl GenServer
-  def handle_call({:bulk_load_posts, filepath}, _from, state) do
-    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+  def handle_call({:bulk_load_posts, source, opts}, _from, state) do
+    total = total_from_source(source, opts)
 
-    filepath
+    source
     |> DataplaneEx.CSV.parse_posts()
     |> DataplaneEx.Progress.each_with_progress(total, "Loading posts", fn {_offset_ms, user_id} ->
       insert_post(next_post_id(), user_id)
@@ -364,5 +382,25 @@ defmodule DataplaneEx.Indexer.ETS do
   defp index_event(event) do
     Logger.debug("unhandled event: #{event}")
     :ok
+  end
+
+  defp total_from_file(path) do
+    DataplaneEx.CSV.read_meta(path)[:total] || DataplaneEx.Progress.count_lines(path)
+  end
+
+  defp total_from_source(source, opts) when is_binary(source) do
+    Keyword.get_lazy(opts, :total, fn -> line_count(source) end)
+  end
+
+  defp total_from_source(_source, opts) do
+    Keyword.get(opts, :total, 0)
+  end
+
+  defp line_count(contents) do
+    contents
+    |> String.split("\n", trim: true)
+    |> length()
+    |> Kernel.-(1)
+    |> max(0)
   end
 end

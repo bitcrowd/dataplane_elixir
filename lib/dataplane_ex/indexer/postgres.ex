@@ -51,55 +51,26 @@ defmodule DataplaneEx.Indexer.Postgres do
     end
   end
 
-  defp extract_first_column(source_path, dest_path, header, total) do
-    dest = File.open!(dest_path, [:write, :raw])
-
-    try do
-      :file.write(dest, [header, ?\n])
-
-      source_path
-      |> File.stream!()
-      |> Stream.drop(1)
-      |> Stream.map(&String.trim/1)
-      |> Stream.reject(&(&1 == ""))
-      |> Progress.each_with_progress(total, "Extracting IDs", fn line ->
-        id = line |> String.split(",", parts: 2) |> hd()
-        :file.write(dest, [id, ?\n])
-      end)
-    after
-      File.close(dest)
-    end
-  end
-
   @impl true
-  def bulk_users(filepath) do
-    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
-    tmp_path = Path.expand(filepath) <> ".ids_only.tmp"
+  def bulk_users(source, opts \\ []) do
+    total = total_from_source(source, opts)
 
-    try do
-      extract_first_column(filepath, tmp_path, "id", total)
-
-      monitor = Progress.monitor_copy("COPY users")
-
-      Ecto.Adapters.SQL.query!(
-        write_repo(),
-        "COPY users (id) FROM '#{tmp_path}' WITH (FORMAT csv, HEADER true)",
-        [],
-        timeout: :infinity
-      )
-
-      Progress.stop_monitor(monitor)
-    after
-      File.rm(tmp_path)
-    end
+    source
+    |> DataplaneEx.CSV.parse_users()
+    |> Stream.map(&[&1, ?\n])
+    |> then(&Stream.concat([["id", ?\n]], &1))
+    |> copy_csv_stream(
+      "COPY users",
+      "COPY users (id) FROM STDIN WITH (FORMAT csv, HEADER true)",
+      total
+    )
 
     :ok
   end
 
   @impl true
-  def bulk_follows(filepath) do
-    abs_path = Path.expand(filepath)
-
+  def bulk_follows(source, opts \\ []) do
+    total = total_from_source(source, opts)
     Logger.info("[bulk_follows] Dropping indexes...")
 
     Ecto.Adapters.SQL.query!(
@@ -114,16 +85,12 @@ defmodule DataplaneEx.Indexer.Postgres do
     )
 
     try do
-      monitor = Progress.monitor_copy("COPY follows")
-
-      Ecto.Adapters.SQL.query!(
-        write_repo(),
-        "COPY follows (actor_id, subject_id) FROM '#{abs_path}' WITH (FORMAT csv, HEADER true)",
-        [],
-        timeout: :infinity
+      copy_csv_stream(
+        csv_lines(source),
+        "COPY follows",
+        "COPY follows (actor_id, subject_id) FROM STDIN WITH (FORMAT csv, HEADER true)",
+        total
       )
-
-      Progress.stop_monitor(monitor)
     after
       monitor = Progress.monitor_create_index("Creating unique index (actor_id, subject_id)")
 
@@ -152,12 +119,12 @@ defmodule DataplaneEx.Indexer.Postgres do
   end
 
   @impl true
-  def bulk_load_posts(filepath, opts \\ []) do
+  def bulk_load_posts(source, opts \\ []) do
     time_offset_ms = Keyword.get(opts, :time_offset_ms, 0)
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:millisecond)
-    total = DataplaneEx.CSV.read_meta(filepath)[:total] || 0
+    total = total_from_source(source, opts)
 
-    filepath
+    source
     |> DataplaneEx.CSV.parse_posts()
     |> Stream.map(fn {offset_ms, user_id} ->
       inserted_at = NaiveDateTime.add(now, time_offset_ms + offset_ms, :millisecond)
@@ -174,6 +141,24 @@ defmodule DataplaneEx.Indexer.Postgres do
     )
 
     :ok
+  end
+
+  def bulk_users_from_file(path, opts \\ []) do
+    path
+    |> File.read!()
+    |> bulk_users(Keyword.put_new(opts, :total, total_from_file(path)))
+  end
+
+  def bulk_follows_from_file(path, opts \\ []) do
+    path
+    |> File.read!()
+    |> bulk_follows(Keyword.put_new(opts, :total, total_from_file(path)))
+  end
+
+  def bulk_load_posts_from_file(path, opts \\ []) do
+    path
+    |> File.stream!()
+    |> bulk_load_posts(Keyword.put_new(opts, :total, total_from_file(path)))
   end
 
   @impl true
@@ -261,6 +246,70 @@ defmodule DataplaneEx.Indexer.Postgres do
   @impl true
   def posts_created do
     Repo.aggregate("posts", :count)
+  end
+
+  defp copy_csv_stream(enumerable, label, statement, _total) do
+    monitor = Progress.monitor_copy(label)
+
+    try do
+      write_repo().transaction(
+        fn ->
+          stream =
+            Ecto.Adapters.SQL.stream(write_repo(), statement, [],
+              timeout: :infinity,
+              max_rows: batch_size()
+            )
+
+          enumerable
+          |> chunk_copy_rows()
+          |> Enum.into(stream)
+        end,
+        timeout: :infinity
+      )
+    after
+      Progress.stop_monitor(monitor)
+    end
+  end
+
+  defp chunk_copy_rows(enumerable) do
+    enumerable
+    |> Stream.chunk_every(batch_size())
+    |> Stream.map(fn chunk -> Enum.map(chunk, &normalize_copy_row/1) end)
+  end
+
+  defp normalize_copy_row(row) when is_binary(row), do: [row, ?\n]
+  defp normalize_copy_row(row), do: row
+
+  defp csv_lines(contents) when is_binary(contents) do
+    contents
+    |> String.splitter("\n", trim: false)
+    |> csv_lines()
+  end
+
+  defp csv_lines(source) do
+    source
+    |> Stream.map(&String.trim/1)
+    |> Stream.reject(&(&1 == ""))
+  end
+
+  defp total_from_file(path) do
+    DataplaneEx.CSV.read_meta(path)[:total] || DataplaneEx.Progress.count_lines(path)
+  end
+
+  defp total_from_source(source, opts) when is_binary(source) do
+    Keyword.get_lazy(opts, :total, fn -> line_count(source) end)
+  end
+
+  defp total_from_source(_source, opts) do
+    Keyword.get(opts, :total, 0)
+  end
+
+  defp line_count(contents) do
+    contents
+    |> String.split("\n", trim: true)
+    |> length()
+    |> Kernel.-(1)
+    |> max(0)
   end
 
   @impl GenServer
