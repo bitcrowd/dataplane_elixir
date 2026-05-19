@@ -24,7 +24,7 @@ defmodule DataplaneEx.ATProto.Identity do
     |> validate_required(@required_attrs)
   end
 
-  def to_jetstream(%Identity{} = identity) do
+  def to_event(%Identity{} = identity) do
     %{did: did, seq: seq, handle: handle, time: time} = identity
 
     kind = :identity

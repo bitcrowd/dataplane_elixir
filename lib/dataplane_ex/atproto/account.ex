@@ -25,7 +25,7 @@ defmodule DataplaneEx.ATProto.Account do
     |> validate_required(@required_attrs)
   end
 
-  def to_jetstream(%Account{} = account) do
+  def to_event(%Account{} = account) do
     %{did: did, seq: seq, active: active, time: time} = account
 
     kind = :account
