@@ -40,8 +40,7 @@ defmodule DataplaneEx.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:car, "~> 0.1.0"},
-      {:cid, "~> 0.0.1"},
+      {:dasl, "~> 0.1"},
       {:fresh, "~> 0.4.4"},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_ecto, "~> 4.5"},

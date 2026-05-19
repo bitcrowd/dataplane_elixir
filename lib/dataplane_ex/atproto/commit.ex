@@ -69,10 +69,8 @@ defmodule DataplaneEx.ATProto.Commit do
 
     [collection, rkey] = Path.split(op.path)
 
-    record = CAR.Archive.get_block(blocks, cid)
-
-    # TODO: fix encoding to follow https://atproto.com/specs/data-model#link-and-cid-formats
-    cid = CID.cid!(cid) |> CID.encode!()
+    record = Map.get(blocks.blocks, cid, %{})
+    cid = DASL.CID.encode(cid)
 
     %{
       did: did,

@@ -6,11 +6,16 @@ defmodule DataplaneEx.CAR do
 
   def type, do: :map
 
+  def cast(%DASL.CAR.DRISL{} = car), do: {:ok, car}
+
   def cast(value) do
     %{tag: :bytes, value: bytes} = value
-    {:ok, car} = CAR.decode(bytes)
 
-    {:ok, car}
+    case DASL.CAR.DRISL.decode(bytes) do
+      {:ok, car} -> {:ok, car}
+      {:error, _reason} -> :error
+      {:error, _section, _reason} -> :error
+    end
   end
 
   def load(data) do

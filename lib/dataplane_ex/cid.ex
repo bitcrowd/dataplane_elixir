@@ -6,19 +6,27 @@ defmodule DataplaneEx.CID do
 
   def type, do: :binary
 
-  def cast(value) do
-    cid_tag = 42
-    %{tag: ^cid_tag, value: %{tag: :bytes, value: cid_binary}} = value
-    {:ok, 0, cid} = CBOR.decode(cid_binary)
+  def cast(%DASL.CID{} = cid), do: {:ok, cid}
 
+  def cast(value) do
+    case DASL.CID.from_cbor(value) do
+      {:ok, cid} -> {:ok, cid}
+      {:error, _reason} -> :error
+    end
+  end
+
+  def load(data) when is_binary(data) do
+    case DASL.CID.from_bytes(data) do
+      {:ok, cid} -> {:ok, cid}
+      {:error, _reason} -> :error
+    end
+  end
+
+  def load(%DASL.CID{} = cid) do
     {:ok, cid}
   end
 
-  def load(data) do
-    {:ok, CID.decode!(data)}
-  end
-
-  def dump(cid) do
-    {:ok, CID.encode!(cid)}
+  def dump(%DASL.CID{bytes: bytes}) do
+    {:ok, bytes}
   end
 end
