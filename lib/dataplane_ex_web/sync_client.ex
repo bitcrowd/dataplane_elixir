@@ -1,4 +1,8 @@
 defmodule DataplaneEx.SyncClient do
+  @moduledoc """
+  Websocket client that streams firehose sync events into Phoenix PubSub.
+  """
+
   use Fresh
 
   alias Phoenix.PubSub
