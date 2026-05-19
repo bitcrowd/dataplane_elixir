@@ -258,29 +258,25 @@ defmodule DataplaneEx.Progress do
   end
 
   defp query_index_progress do
-    try do
-      result =
-        DataplaneEx.Repo.query!(
-          "SELECT phase, tuples_total, tuples_done, blocks_total, blocks_done FROM pg_stat_progress_create_index LIMIT 1",
-          [],
-          timeout: 5_000
-        )
+    result =
+      DataplaneEx.Repo.query!(
+        "SELECT phase, tuples_total, tuples_done, blocks_total, blocks_done FROM pg_stat_progress_create_index LIMIT 1",
+        [],
+        timeout: 5_000
+      )
 
-      case result.rows do
-        [[phase, tuples_total, tuples_done, blocks_total, blocks_done]] ->
-          %{
-            phase: phase,
-            tuples_total: tuples_total,
-            tuples_done: tuples_done,
-            blocks_total: blocks_total,
-            blocks_done: blocks_done
-          }
+    case result.rows do
+      [[phase, tuples_total, tuples_done, blocks_total, blocks_done]] ->
+        %{
+          phase: phase,
+          tuples_total: tuples_total,
+          tuples_done: tuples_done,
+          blocks_total: blocks_total,
+          blocks_done: blocks_done
+        }
 
-        [] ->
-          nil
-      end
-    rescue
-      _ -> nil
+      [] ->
+        nil
     end
   end
 
