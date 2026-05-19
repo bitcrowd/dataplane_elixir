@@ -39,7 +39,7 @@ defmodule DataplaneEx.ATProto.Event do
 
     case Changeset.apply_action(changeset, :validate) do
       {:ok, commit} ->
-        Commit.to_jetstream(commit)
+        Commit.to_event(commit)
 
       {:error, changeset} ->
         Logger.error(changeset.errors)
@@ -54,7 +54,7 @@ defmodule DataplaneEx.ATProto.Event do
 
     case Changeset.apply_action(changeset, :validate) do
       {:ok, identity} ->
-        Identity.to_jetstream(identity)
+        Identity.to_event(identity)
 
       {:error, changeset} ->
         Logger.error(changeset.errors)
@@ -69,7 +69,7 @@ defmodule DataplaneEx.ATProto.Event do
 
     case Changeset.apply_action(changeset, :validate) do
       {:ok, account} ->
-        Account.to_jetstream(account)
+        Account.to_event(account)
 
       {:error, changeset} ->
         Logger.error(changeset.errors)

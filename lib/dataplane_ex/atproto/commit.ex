@@ -31,13 +31,13 @@ defmodule DataplaneEx.ATProto.Commit do
     |> validate_required(@required_attrs)
   end
 
-  def to_jetstream(%Commit{} = commit) do
+  def to_event(%Commit{} = commit) do
     for op <- commit.ops do
-      to_jetstream(op, commit)
+      to_event(op, commit)
     end
   end
 
-  defp to_jetstream(%{action: "delete"} = op, commit) do
+  defp to_event(%{action: "delete"} = op, commit) do
     %{repo: did, rev: rev} = commit
     kind = :commit
     jetstream_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
@@ -59,7 +59,7 @@ defmodule DataplaneEx.ATProto.Commit do
     }
   end
 
-  defp to_jetstream(op, commit) do
+  defp to_event(op, commit) do
     %{repo: did, rev: rev, blocks: blocks} = commit
     kind = :commit
     jetstream_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
