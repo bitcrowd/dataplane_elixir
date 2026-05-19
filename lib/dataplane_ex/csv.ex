@@ -70,7 +70,8 @@ defmodule DataplaneEx.CSV do
     |> Stream.reject(&(&1 == ""))
     |> Stream.map(fn line ->
       [user_did, _indexed_at, _trusted_verifier] = String.split(line, ",", parts: 3)
-      user_did
+
+      remove_quotes(user_did)
     end)
   end
 
@@ -93,7 +94,7 @@ defmodule DataplaneEx.CSV do
     |> Stream.map(fn line ->
       [_uri, _cid, actor_did, subject_did | _rest] = String.split(line, ",")
 
-      {actor_did, subject_did}
+      {remove_quotes(actor_did), remove_quotes(subject_did)}
     end)
   end
 
@@ -117,5 +118,9 @@ defmodule DataplaneEx.CSV do
       [offset_ms, user_id] = line |> String.split(",")
       {String.to_integer(offset_ms), user_id}
     end)
+  end
+
+  defp remove_quotes(id) do
+    String.trim(id, "\"")
   end
 end
