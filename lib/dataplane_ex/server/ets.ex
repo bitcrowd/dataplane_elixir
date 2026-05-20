@@ -12,15 +12,10 @@ defmodule DataplaneEx.Server.ETS do
 
   @impl true
   def get_timeline({user_id, limit, _cursor}) do
-    :telemetry.span([:dataplane_ex, :get_timeline], %{user_id: user_id}, fn ->
-      result =
-        user_id
-        |> Indexer.get_timeline()
-        |> Enum.sort(:desc)
-        |> Enum.take(limit)
-        |> Enum.map(fn post_id -> %{id: post_id} end)
-
-      {{:ok, result}, %{rows: length(result)}}
-    end)
+    user_id
+    |> Indexer.get_timeline()
+    |> Enum.sort(:desc)
+    |> Enum.take(limit)
+    |> Enum.map(fn post_id -> %{id: post_id} end)
   end
 end

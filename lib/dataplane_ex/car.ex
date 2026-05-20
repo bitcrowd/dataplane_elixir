@@ -8,9 +8,11 @@ defmodule DataplaneEx.CAR do
 
   def cast(%DASL.CAR.DRISL{} = car), do: {:ok, car}
 
-  def cast(value) do
-    %{tag: :bytes, value: bytes} = value
+  def cast(%CBOR.Tag{tag: :bytes, value: bytes}) do
+    cast(bytes)
+  end
 
+  def cast(bytes) do
     case DASL.CAR.DRISL.decode(bytes) do
       {:ok, car} -> {:ok, car}
       {:error, _reason} -> :error

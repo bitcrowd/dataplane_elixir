@@ -14,8 +14,12 @@ defmodule DataplaneEx.Server do
 
   @callback get_timeline(timeline_request()) :: timeline_response()
 
-  def get_timeline(request) do
-    server().get_timeline(request)
+  def get_timeline({user_id, _limit, _cursor} = request) do
+    :telemetry.span([:dataplane_ex, :get_timeline], %{user_id: user_id}, fn ->
+      result = server().get_timeline(request)
+
+      {{:ok, result}, %{rows: length(result)}}
+    end)
   end
 
   def server do

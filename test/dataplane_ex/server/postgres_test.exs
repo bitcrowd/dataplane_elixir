@@ -38,7 +38,7 @@ defmodule DataplaneEx.Server.PostgresTest do
   end
 
   test "returns posts from followed users ordered by inserted_at desc", ctx do
-    {:ok, timeline} = Postgres.get_timeline({"1", 10, nil})
+    timeline = Postgres.get_timeline({"1", 10, nil})
 
     followed_ids =
       (ctx.posts_by_author["2"] ++ ctx.posts_by_author["3"])
@@ -52,20 +52,20 @@ defmodule DataplaneEx.Server.PostgresTest do
   end
 
   test "excludes posts from unfollowed users" do
-    {:ok, timeline} = Postgres.get_timeline({"1", 10, nil})
+    timeline = Postgres.get_timeline({"1", 10, nil})
     author_ids = Enum.map(timeline, & &1.author_id) |> Enum.uniq()
 
     refute "4" in author_ids
   end
 
   test "respects the limit parameter" do
-    {:ok, timeline} = Postgres.get_timeline({"1", 2, nil})
+    timeline = Postgres.get_timeline({"1", 2, nil})
 
     assert length(timeline) == 2
   end
 
   test "returns empty list for user with no follows" do
-    {:ok, timeline} = Postgres.get_timeline({"4", 10, nil})
+    timeline = Postgres.get_timeline({"4", 10, nil})
     assert timeline == []
   end
 
@@ -74,7 +74,7 @@ defmodule DataplaneEx.Server.PostgresTest do
     Repo.insert_all("follows", [%{actor_id: "5", subject_id: "4"}])
     Repo.delete_all(from(p in "posts", where: p.author_id == "4"))
 
-    {:ok, timeline} = Postgres.get_timeline({"5", 10, nil})
+    timeline = Postgres.get_timeline({"5", 10, nil})
     assert timeline == []
   end
 end

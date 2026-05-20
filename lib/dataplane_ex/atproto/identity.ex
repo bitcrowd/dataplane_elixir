@@ -28,11 +28,11 @@ defmodule DataplaneEx.ATProto.Identity do
     %{did: did, seq: seq, handle: handle, time: time} = identity
 
     kind = :identity
-    jetstream_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
+    event_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
 
     %{
       did: did,
-      time_us: jetstream_time,
+      time_us: event_time,
       kind: kind,
       identity: %{
         did: did,
