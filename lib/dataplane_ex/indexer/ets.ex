@@ -397,10 +397,15 @@ defmodule DataplaneEx.Indexer.ETS do
   end
 
   defp line_count(contents) do
-    contents
-    |> String.split("\n", trim: true)
-    |> length()
-    |> Kernel.-(1)
-    |> max(0)
+    lines =
+      contents
+      |> String.split("\n", trim: true)
+      |> length()
+
+    if lines > 0 do
+      lines - 1
+    else
+      0
+    end
   end
 end

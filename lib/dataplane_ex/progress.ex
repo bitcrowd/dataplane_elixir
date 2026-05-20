@@ -22,13 +22,18 @@ defmodule DataplaneEx.Progress do
   Reads in 256 KB binary chunks and counts newline characters.
   """
   def count_lines(filepath) do
-    filepath
-    |> File.stream!(256 * 1024)
-    |> Enum.reduce(0, fn chunk, acc ->
-      acc + count_newlines(chunk)
-    end)
-    |> Kernel.-(1)
-    |> max(0)
+    lines =
+      filepath
+      |> File.stream!(256 * 1024)
+      |> Enum.reduce(0, fn chunk, acc ->
+        acc + count_newlines(chunk)
+      end)
+
+    if lines > 0 do
+      lines - 1
+    else
+      0
+    end
   end
 
   defp count_newlines(<<>>), do: 0
