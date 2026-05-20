@@ -15,20 +15,10 @@ defmodule DataplaneEx.Application do
         {DNSCluster, query: Application.get_env(:dataplane_ex, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: DataplaneEx.PubSub},
         dataplane_indexer(),
-        DataplaneExWeb.Endpoint
+        DataplaneExWeb.Endpoint,
+        sync_client()
       ]
       |> Enum.reject(&is_nil/1)
-
-    children =
-      if url = relay_url() do
-        children ++
-          [
-            {DataplaneEx.SyncClient,
-             uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos", name: {:local, :simulator}}
-          ]
-      else
-        children
-      end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -44,11 +34,18 @@ defmodule DataplaneEx.Application do
     :ok
   end
 
-  def relay_url() do
-    Application.get_env(:dataplane_ex, :bsky_relay_websocket, nil)
-  end
-
   def dataplane_indexer() do
     Application.get_env(:dataplane_ex, :indexer, DataplaneEx.Indexer.ETS)
+  end
+
+  def sync_client() do
+    if url = relay_url() do
+      {DataplaneEx.SyncClient,
+       uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos", name: {:local, :sync}}
+    end
+  end
+
+  def relay_url() do
+    Application.get_env(:dataplane_ex, :bsky_relay_websocket, nil)
   end
 end
