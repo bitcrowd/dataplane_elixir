@@ -23,26 +23,26 @@ defmodule DataplaneEx.Server.ETSTest do
       Indexer.create_post(%{user_id: did1})
       Indexer.create_post(%{user_id: did2})
 
-      {:ok, timeline} = Server.get_timeline({did3, 10, nil})
+      timeline = Server.get_timeline({did3, 10, nil})
       assert length(timeline) == 2
     end
 
     test "respects the limit parameter", %{did1: did1, did2: did2} do
       for _ <- 1..5, do: Indexer.create_post(%{user_id: did1})
 
-      {:ok, timeline} = Server.get_timeline({did2, 3, nil})
+      timeline = Server.get_timeline({did2, 3, nil})
       assert length(timeline) == 3
     end
 
     test "returns empty list for user with no follows", %{did1: did1, did2: did2} do
       Indexer.create_post(%{user_id: did2})
 
-      {:ok, timeline} = Server.get_timeline({did1, 10, nil})
+      timeline = Server.get_timeline({did1, 10, nil})
       assert timeline == []
     end
 
     test "returns empty list when no posts exist", %{did2: did2} do
-      {:ok, timeline} = Server.get_timeline({did2, 10, nil})
+      timeline = Server.get_timeline({did2, 10, nil})
       assert timeline == []
     end
 
@@ -51,7 +51,7 @@ defmodule DataplaneEx.Server.ETSTest do
       Indexer.create_post(%{user_id: did1})
       Indexer.create_post(%{user_id: did1})
 
-      {:ok, timeline} = Server.get_timeline({did2, 10, nil})
+      timeline = Server.get_timeline({did2, 10, nil})
       ids = Enum.map(timeline, & &1.id)
 
       assert ids == Enum.sort(ids, :desc)
