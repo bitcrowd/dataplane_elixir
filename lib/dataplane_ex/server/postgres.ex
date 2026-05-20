@@ -1,4 +1,8 @@
 defmodule DataplaneEx.Server.Postgres do
+  @moduledoc """
+  Postgres-backed server queries for timeline reads.
+  """
+
   @behaviour DataplaneEx.Server
 
   import Ecto.Query

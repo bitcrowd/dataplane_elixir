@@ -1,4 +1,8 @@
 defmodule DataplaneEx.Indexer.Postgres do
+  @moduledoc """
+  Postgres-backed indexer implementation for users, follows, and posts.
+  """
+
   @behaviour DataplaneEx.Indexer
 
   use GenServer
@@ -210,31 +214,40 @@ defmodule DataplaneEx.Indexer.Postgres do
       [:dataplane_ex, :toggle_follow],
       %{actor_id: actor_id, subject_id: subject_id},
       fn ->
-        result =
-          write_repo().transaction(fn ->
-            deleted_count =
-              from(f in "follows",
-                where: f.actor_id == ^actor_id and f.subject_id == ^subject_id
-              )
-              |> write_repo().delete_all()
-              |> elem(0)
-
-            if deleted_count == 0 do
-              write_repo().insert_all(
-                "follows",
-                [%{actor_id: actor_id, subject_id: subject_id}],
-                on_conflict: :nothing,
-                conflict_target: [:actor_id, :subject_id]
-              )
-            end
-          end)
-          |> case do
-            {:ok, _} -> :ok
-            {:error, reason} -> {:error, reason}
-          end
+        result = toggle_follow_transaction(actor_id, subject_id)
 
         {result, %{}}
       end
+    )
+  end
+
+  defp toggle_follow_transaction(actor_id, subject_id) do
+    write_repo().transaction(fn ->
+      case delete_follow(actor_id, subject_id) do
+        0 -> insert_follow(actor_id, subject_id)
+        _ -> :ok
+      end
+    end)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp delete_follow(actor_id, subject_id) do
+    from(f in "follows",
+      where: f.actor_id == ^actor_id and f.subject_id == ^subject_id
+    )
+    |> write_repo().delete_all()
+    |> elem(0)
+  end
+
+  defp insert_follow(actor_id, subject_id) do
+    write_repo().insert_all(
+      "follows",
+      [%{actor_id: actor_id, subject_id: subject_id}],
+      on_conflict: :nothing,
+      conflict_target: [:actor_id, :subject_id]
     )
   end
 

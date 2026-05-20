@@ -159,7 +159,7 @@ defmodule DataplaneEx.Indexer.PostgresTest do
       assert :ok = Indexer.create_post(%{user_id: "2"})
 
       posts = Repo.all(from(p in "posts", where: p.author_id == "2", select: p.id))
-      assert length(posts) > 0
+      assert posts != []
     end
 
     test "raises on foreign key violation for non-existent user" do
