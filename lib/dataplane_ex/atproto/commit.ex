@@ -40,7 +40,7 @@ defmodule DataplaneEx.ATProto.Commit do
   defp to_event(%{action: "delete"} = op, commit) do
     %{repo: did, rev: rev} = commit
     kind = :commit
-    jetstream_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
+    event_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
 
     operation = op.action
 
@@ -48,7 +48,7 @@ defmodule DataplaneEx.ATProto.Commit do
 
     %{
       did: did,
-      time_us: jetstream_time,
+      time_us: event_time,
       kind: kind,
       commit: %{
         rev: rev,
@@ -62,7 +62,7 @@ defmodule DataplaneEx.ATProto.Commit do
   defp to_event(op, commit) do
     %{repo: did, rev: rev, blocks: blocks} = commit
     kind = :commit
-    jetstream_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
+    event_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
 
     operation = op.action
     cid = op.cid
@@ -74,7 +74,7 @@ defmodule DataplaneEx.ATProto.Commit do
 
     %{
       did: did,
-      time_us: jetstream_time,
+      time_us: event_time,
       kind: kind,
       commit: %{
         rev: rev,
