@@ -15,7 +15,6 @@ defmodule DataplaneEx.CAR do
   def cast(bytes) do
     case DASL.CAR.DRISL.decode(bytes) do
       {:ok, car} -> {:ok, car}
-      {:error, _reason} -> :error
       {:error, _section, _reason} -> :error
     end
   end
