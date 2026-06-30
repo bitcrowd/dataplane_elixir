@@ -31,7 +31,7 @@ defmodule DataplaneEx.Indexer do
   @post_id_counter_key :social_graph_post_id_counter
   @posts_planned_counter_key :social_graph_posts_planned_counter
 
-  @supported_options MapSet.new([:fan_out_limit])
+  @supported_options [:fan_out_limit]
   @config_key :indexer_ets_config
 
   @print_interval_ms 1_000
@@ -195,21 +195,12 @@ defmodule DataplaneEx.Indexer do
   def feeds_table, do: @feeds_table
   def celebrity_posts_table, do: @celebrity_posts_table
 
-  defp validate_options!(opts, supported) do
-    unsupported = opts |> Keyword.keys() |> Enum.reject(&MapSet.member?(supported, &1))
-
-    if unsupported != [] do
-      raise ArgumentError, "unsupported indexer options: #{inspect(unsupported)}"
-    end
-
-    :ok
-  end
-
   @impl GenServer
   def init(opts) do
+    opts = Keyword.validate!(opts, @supported_options)
+
     Phoenix.PubSub.subscribe(DataplaneEx.PubSub, "firehose")
 
-    validate_options!(opts, @supported_options)
     :persistent_term.put(@config_key, Map.new(opts))
 
     :ets.new(@users_table, [:set, :named_table, :protected, read_concurrency: true])
