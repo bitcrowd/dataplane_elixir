@@ -411,7 +411,6 @@ defmodule DataplaneEx.Indexer do
     end
   end
 
-
   defp format_number(n) when n >= 1_000_000_000 do
     "#{Float.round(n / 1_000_000_000, 2)}B"
   end
@@ -454,7 +453,6 @@ defmodule DataplaneEx.Indexer do
       0
     end
   end
-
 
   defp count_newlines(<<>>), do: 0
 
