@@ -34,6 +34,8 @@ defmodule DataplaneEx.Indexer do
   @supported_options MapSet.new([:fan_out_limit])
   @config_key :indexer_ets_config
 
+  @print_interval_ms 1_000
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -270,7 +272,7 @@ defmodule DataplaneEx.Indexer do
 
     source
     |> DataplaneEx.CSV.parse_users()
-    |> DataplaneEx.Progress.each_with_progress(total, "Loading users", fn user_id ->
+    |> each_with_progress(total, "Loading users", fn user_id ->
       :ets.insert(@users_table, {user_id})
     end)
 
@@ -283,7 +285,7 @@ defmodule DataplaneEx.Indexer do
 
     source
     |> DataplaneEx.CSV.parse_edges()
-    |> DataplaneEx.Progress.each_with_progress(total, "Loading follows", fn {actor_id, subject_id} ->
+    |> each_with_progress(total, "Loading follows", fn {actor_id, subject_id} ->
       :ets.insert(@followers_table, {subject_id, actor_id})
       :ets.insert(@following_table, {actor_id, subject_id})
     end)
@@ -297,7 +299,7 @@ defmodule DataplaneEx.Indexer do
 
     source
     |> DataplaneEx.CSV.parse_posts()
-    |> DataplaneEx.Progress.each_with_progress(total, "Loading posts", fn {_offset_ms, user_id} ->
+    |> each_with_progress(total, "Loading posts", fn {_offset_ms, user_id} ->
       insert_post(next_post_id(), user_id)
     end)
 
@@ -349,8 +351,130 @@ defmodule DataplaneEx.Indexer do
     :ok
   end
 
+  def each_with_progress(enumerable, total, label, fun, opts \\ []) do
+    step = Keyword.get(opts, :step, 1)
+    started_at = System.monotonic_time(:millisecond)
+    last_print = started_at
+    count = 0
+
+    {final_count, _} =
+      Enum.reduce(enumerable, {count, last_print}, fn element, {n, lp} ->
+        fun.(element)
+        n = n + step
+        now = System.monotonic_time(:millisecond)
+
+        if now - lp >= @print_interval_ms do
+          print_progress(label, n, total, started_at, now)
+          {n, now}
+        else
+          {n, lp}
+        end
+      end)
+
+    finish(label, final_count, started_at)
+    :ok
+  end
+
+  defp print_progress(label, count, 0, started_at, now) do
+    elapsed = now - started_at
+    rate = rate_string(count, elapsed)
+    Logger.info("\r\e[2K#{label}: #{format_number(count)} rows — #{rate}")
+  end
+
+  defp print_progress(label, count, total, started_at, now) do
+    elapsed = now - started_at
+    pct = Float.round(count / total * 100, 1)
+    rate = rate_string(count, elapsed)
+
+    eta =
+      if count > 0 do
+        remaining = trunc((total - count) / count * elapsed)
+        " — ETA #{format_duration(remaining)}"
+      else
+        ""
+      end
+
+    Logger.info(
+      "\r\e[2K#{label}: #{format_number(count)} / #{format_number(total)} (#{pct}%) — #{rate}#{eta}"
+    )
+  end
+
+  defp finish(label, count, started_at) do
+    elapsed = System.monotonic_time(:millisecond) - started_at
+    rate = rate_string(count, elapsed)
+
+    Logger.info(
+      "\r\e[2K#{label}: #{format_number(count)} rows — #{rate} — #{format_duration(elapsed)}\n"
+    )
+  end
+
+  defp rate_string(_count, elapsed) when elapsed <= 0, do: "—"
+
+  defp rate_string(count, elapsed) do
+    per_sec = count / elapsed * 1000
+
+    cond do
+      per_sec >= 1_000_000 -> "#{Float.round(per_sec / 1_000_000, 1)}M rows/s"
+      per_sec >= 1_000 -> "#{Float.round(per_sec / 1_000, 1)}K rows/s"
+      true -> "#{trunc(per_sec)} rows/s"
+    end
+  end
+
+
+  defp format_number(n) when n >= 1_000_000_000 do
+    "#{Float.round(n / 1_000_000_000, 2)}B"
+  end
+
+  defp format_number(n) when n >= 1_000_000 do
+    "#{Float.round(n / 1_000_000, 1)}M"
+  end
+
+  defp format_number(n) when n >= 1_000 do
+    n
+    |> Integer.to_string()
+    |> String.reverse()
+    |> String.replace(~r/.{3}/, "\\0,")
+    |> String.replace(~r/,$/, "")
+    |> String.reverse()
+  end
+
+  defp format_number(n), do: Integer.to_string(n)
+
+  defp format_duration(ms) when ms < 1_000, do: "<1s"
+  defp format_duration(ms) when ms < 60_000, do: "#{div(ms, 1_000)}s"
+
+  defp format_duration(ms) do
+    minutes = div(ms, 60_000)
+    seconds = div(rem(ms, 60_000), 1_000)
+    "#{minutes}m #{seconds}s"
+  end
+
+  defp count_lines(filepath) do
+    lines =
+      filepath
+      |> File.stream!(256 * 1024)
+      |> Enum.reduce(0, fn chunk, acc ->
+        acc + count_newlines(chunk)
+      end)
+
+    if lines > 0 do
+      lines - 1
+    else
+      0
+    end
+  end
+
+
+  defp count_newlines(<<>>), do: 0
+
+  defp count_newlines(binary) do
+    for <<byte <- binary>>, byte == ?\n, reduce: 0 do
+      acc -> acc + 1
+    end
+  end
+
   defp total_from_file(path) do
-    DataplaneEx.CSV.read_meta(path)[:total] || DataplaneEx.Progress.count_lines(path)
+    DataplaneEx.CSV.read_meta(path)[:total] || count_lines(path)
   end
 
   defp total_from_source(source, opts) when is_binary(source) do
