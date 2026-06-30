@@ -1,10 +1,6 @@
 defmodule DataplaneEx.Server.ETS do
   @moduledoc """
   ETS-backed implementation of the Dataplane Server.
-
-  Delegates to `DataplaneEx.Indexer.ETS` for timeline reads.
-  Emits the same telemetry spans as the Postgres implementation so metrics
-  are comparable.
   """
   @behaviour DataplaneEx.Server
 

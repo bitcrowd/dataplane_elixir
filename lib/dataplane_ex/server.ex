@@ -1,10 +1,6 @@
 defmodule DataplaneEx.Server do
   @moduledoc """
-  Behaviour defining the dataplane server interface.
-
-  Implementations provide the actual data access layer — Postgres, ETS,
-  in-memory, etc. The simulator calls into whichever implementation is
-  configured, allowing apples-to-apples performance comparison.
+  Dataplane server interface
   """
 
   @type user_id :: String.t()
@@ -23,7 +19,7 @@ defmodule DataplaneEx.Server do
     end)
   end
 
-  def server do
+  defp server do
     Application.fetch_env!(:dataplane_ex, :server)
   end
 end

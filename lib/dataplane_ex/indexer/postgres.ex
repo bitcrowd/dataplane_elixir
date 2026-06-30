@@ -1,6 +1,6 @@
 defmodule DataplaneEx.Indexer.Postgres do
   @moduledoc """
-  Postgres-backed indexer implementation for users, follows, and posts.
+  Postgres implementation of the Dataplane Indexer.
   """
 
   @behaviour DataplaneEx.Indexer

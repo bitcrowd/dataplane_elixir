@@ -1,6 +1,6 @@
 defmodule DataplaneEx.Indexer.ETS do
   @moduledoc """
-  In-memory ETS-backed implementation of the Dataplane Indexer.
+  ETS implementation of the Dataplane Indexer.
 
   Stores the social graph, posts, and feeds in six named ETS tables:
 
@@ -32,10 +32,6 @@ defmodule DataplaneEx.Indexer.ETS do
   @celebrity_posts_table :social_graph_celebrity_posts
   @post_id_counter_key :social_graph_post_id_counter
   @posts_planned_counter_key :social_graph_posts_planned_counter
-
-  # ---------------------------------------------------------------------------
-  # Client API (Indexer behaviour)
-  # ---------------------------------------------------------------------------
 
   @supported_options MapSet.new([:fan_out_limit])
   @config_key :indexer_ets_config
@@ -99,10 +95,6 @@ defmodule DataplaneEx.Indexer.ETS do
     :ets.info(@following_table, :size)
   end
 
-  # ---------------------------------------------------------------------------
-  # Read helpers (Indexer behaviour + available to the Server / anyone)
-  # ---------------------------------------------------------------------------
-
   @impl DataplaneEx.Indexer
   def followers(user_id) do
     @followers_table
@@ -158,26 +150,16 @@ defmodule DataplaneEx.Indexer.ETS do
     |> Enum.map(&elem(&1, 1))
   end
 
-  @doc "Check whether `user_id` exists in the users table."
   def user_exists?(user_id) do
     :ets.member(@users_table, user_id)
   end
 
-  # ---------------------------------------------------------------------------
-  # Posts helpers (ETS-specific, lock-free, callable from any process)
-  # ---------------------------------------------------------------------------
-
-  @doc "Generate and return the next unique post ID (atomics, lock-free)."
   def next_post_id do
     :atomics.add_get(:persistent_term.get(@post_id_counter_key), 1, 1)
   end
 
   @doc """
   Insert a post and fan it out to the feeds of all the author's followers.
-
-  When `fan_out_limit` is configured, authors whose follower count exceeds
-  the limit are stored in the `celebrity_posts` table instead of being
-  fanned out. These posts are merged at read time in `get_timeline/1`.
   """
   def insert_post(post_id, author_id) do
     :ets.insert(@posts_table, {post_id, author_id})
@@ -194,16 +176,12 @@ defmodule DataplaneEx.Indexer.ETS do
     end
   end
 
-  @doc "Add a post to a user's feed."
   def insert_feed_entry(user_id, post_id) do
     :ets.insert(@feeds_table, {user_id, post_id})
   end
 
   @doc """
   Return the list of post IDs in a user's feed.
-
-  Merges the fan-out feed with any celebrity posts authored by users
-  that `user_id` follows.
   """
   def get_timeline(user_id) do
     fan_out_posts =
@@ -222,20 +200,12 @@ defmodule DataplaneEx.Indexer.ETS do
     fan_out_posts ++ celebrity_posts
   end
 
-  # ---------------------------------------------------------------------------
-  # Table name accessors (useful for tests / introspection)
-  # ---------------------------------------------------------------------------
-
   def users_table, do: @users_table
   def followers_table, do: @followers_table
   def following_table, do: @following_table
   def posts_table, do: @posts_table
   def feeds_table, do: @feeds_table
   def celebrity_posts_table, do: @celebrity_posts_table
-
-  # ---------------------------------------------------------------------------
-  # GenServer callbacks
-  # ---------------------------------------------------------------------------
 
   @impl GenServer
   def init(opts) do

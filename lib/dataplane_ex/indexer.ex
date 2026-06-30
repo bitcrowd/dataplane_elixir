@@ -1,9 +1,6 @@
 defmodule DataplaneEx.Indexer do
   @moduledoc """
-  Behaviour defining the dataplane indexer interface.
-
-  Implementations handle bulk data loading and cleanup — importing follow
-  graphs, vacuuming tables, etc. The query path lives in `Dataplane.Server`.
+  Dataplane indexer interface.
   """
 
   @callback bulk_users(source :: String.t() | Enumerable.t(), opts :: keyword()) ::
@@ -27,24 +24,16 @@ defmodule DataplaneEx.Indexer do
 
   @active_indexer_key :dataplane_ex_active_indexer
 
-  @doc """
-  Register `module` as the active indexer so the telemetry poller can
-  call `posts_planned/0` and `posts_created/0` without hard-coding the
-  implementation.
-  """
+  @doc "Registers `module` as the active indexer."
   def register_active(module) do
     :persistent_term.put(@active_indexer_key, module)
   end
 
-  @doc "Return the currently registered indexer module, or `nil`."
+  @doc "Returns the currently registered indexer module, or `nil`."
   def active_indexer do
     :persistent_term.get(@active_indexer_key, nil)
   end
 
-  @doc """
-  Validate that all keys in `opts` are in the `supported` set.
-  Raises `ArgumentError` listing any unsupported keys.
-  """
   def validate_options!(opts, supported) do
     unsupported = opts |> Keyword.keys() |> Enum.reject(&MapSet.member?(supported, &1))
 

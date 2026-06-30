@@ -1,7 +1,6 @@
 defmodule DataplaneEx.CAR do
-  @moduledoc """
-  `Ecto.Type` for `CAR`
-  """
+  @moduledoc false
+
   use Ecto.Type
 
   def type, do: :map
