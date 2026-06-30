@@ -1,8 +1,7 @@
 import Config
 
 config :dataplane_ex,
-  bsky_relay_websocket: System.get_env("BSKY_RELAY_WEBSOCKET") || "ws://localhost:4000",
-  indexer: DataplaneEx.Indexer.ETS
+  bsky_relay_websocket: System.get_env("BSKY_RELAY_WEBSOCKET") || "ws://localhost:4000"
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
