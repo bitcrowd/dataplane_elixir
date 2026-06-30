@@ -41,7 +41,7 @@ defmodule DataplaneEx.Application do
   def sync_client() do
     if url = relay_url() do
       {DataplaneEx.SyncClient,
-       uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos", name: {:local, :sync}}
+       uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos", name: :sync}
     end
   end
 

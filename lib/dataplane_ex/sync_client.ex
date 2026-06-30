@@ -1,55 +1,59 @@
 defmodule DataplaneEx.SyncClient do
   @moduledoc """
-  Websocket client that streams firehose sync events into Phoenix PubSub.
+  WebSocket client that streams firehose sync events into Phoenix PubSub.
   """
 
-  use Fresh
+  use WebSockex
 
   alias Phoenix.PubSub
 
   require Logger
 
   def start_link(opts) do
-    uri = opts[:uri]
-    name = opts[:name]
-    state = %{uri: uri}
+    uri = Keyword.fetch!(opts, :uri)
+    name = Keyword.fetch!(opts, :name)
 
-    Fresh.start_link(uri, __MODULE__, state, name: name)
+    WebSockex.start_link(uri, __MODULE__, %{uri: uri},
+      name: name,
+      async: true,
+      handle_initial_conn_failure: true
+    )
   end
 
-  def handle_connect(_status, _headers, state) do
+  @impl WebSockex
+  def handle_connect(_conn, state) do
     Logger.debug("[SyncClient] connected to #{state.uri}")
     {:ok, state}
   end
 
-  def handle_control(_data, state) do
+  @impl WebSockex
+  def handle_frame({:binary, _data} = frame, state) do
+    PubSub.broadcast(DataplaneEx.PubSub, "firehose", frame)
     {:ok, state}
   end
 
-  def handle_disconnect(_code, _reason, state) do
-    Logger.debug("[SyncClient] disconnected")
-    Logger.debug("[SyncClient] reconnecting...")
+  def handle_frame(_frame, state), do: {:ok, state}
+
+  @impl WebSockex
+  def handle_disconnect(%{reason: {_source, :normal}}, state) do
+    Logger.debug("[SyncClient] disconnected, reconnecting...")
     {:reconnect, state}
   end
 
-  def handle_error(error, state) do
-    Logger.error("[SyncClient] error: #{inspect(error)}")
-    Logger.debug("[SyncClient] reconnecting...")
+  def handle_disconnect(%{reason: reason, attempt_number: attempt}, state) do
+    Logger.error("[SyncClient] disconnected: #{inspect(reason)} (attempt #{attempt}), reconnecting...")
     {:reconnect, state}
   end
 
-  def handle_in(event, state) do
-    PubSub.broadcast(DataplaneEx.PubSub, "firehose", event)
+  @impl WebSockex
+  def handle_info(message, state) do
+    Logger.debug("[SyncClient] unexpected message: #{inspect(message)}")
     {:ok, state}
   end
 
-  def handle_info(_data, state) do
-    Logger.debug("[SyncClient] unknown data")
-    {:ok, state}
-  end
-
-  def handle_terminate(_reason, state) do
-    Logger.debug("[SyncClient] terminating")
-    {:terminating, state}
+  @impl WebSockex
+  def terminate(reason, _state) do
+    Logger.debug("[SyncClient] terminating: #{inspect(reason)}")
+    :ok
   end
 end

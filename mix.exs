@@ -5,7 +5,7 @@ defmodule DataplaneEx.MixProject do
     [
       app: :dataplane_ex,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -46,7 +46,7 @@ defmodule DataplaneEx.MixProject do
   defp deps do
     [
       {:dasl, "~> 0.1"},
-      {:fresh, "~> 0.4.4"},
+      {:websockex, "~> 0.5.1"},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
