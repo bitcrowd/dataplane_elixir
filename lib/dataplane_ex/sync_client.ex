@@ -41,7 +41,10 @@ defmodule DataplaneEx.SyncClient do
   end
 
   def handle_disconnect(%{reason: reason, attempt_number: attempt}, state) do
-    Logger.error("[SyncClient] disconnected: #{inspect(reason)} (attempt #{attempt}), reconnecting...")
+    Logger.error(
+      "[SyncClient] disconnected: #{inspect(reason)} (attempt #{attempt}), reconnecting..."
+    )
+
     {:reconnect, state}
   end
 

@@ -37,8 +37,9 @@ defmodule DataplaneEx.CSV do
     |> Enum.reduce(%{}, fn line, acc ->
       case String.split(line, ":", parts: 2) do
         [key, value] ->
-          key = key |> String.trim() |> String.to_atom()
+          key = key |> String.trim() |> String.to_existing_atom()
           value = value |> String.trim() |> String.to_integer()
+
           Map.put(acc, key, value)
 
         _ ->
