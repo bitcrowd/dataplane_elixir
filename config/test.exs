@@ -1,5 +1,7 @@
 import Config
 
+config :dataplane_ex, start_indexer: false
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :dataplane_ex, DataplaneExWeb.Endpoint,

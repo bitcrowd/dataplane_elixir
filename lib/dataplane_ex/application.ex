@@ -12,7 +12,7 @@ defmodule DataplaneEx.Application do
         DataplaneExWeb.Telemetry,
         {DNSCluster, query: Application.get_env(:dataplane_ex, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: DataplaneEx.PubSub},
-        DataplaneEx.Indexer,
+        indexer(),
         DataplaneExWeb.Endpoint,
         sync_client()
       ]
@@ -30,6 +30,10 @@ defmodule DataplaneEx.Application do
   def config_change(changed, _new, removed) do
     DataplaneExWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  def indexer() do
+    if Application.get_env(:dataplane_ex, :start_indexer, true), do: DataplaneEx.Indexer
   end
 
   def sync_client() do
