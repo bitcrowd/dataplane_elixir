@@ -1,7 +1,7 @@
-defmodule DataplaneEx.Indexer.ETSTest do
+defmodule DataplaneEx.IndexerTest do
   use ExUnit.Case, async: false
 
-  alias DataplaneEx.Indexer.ETS, as: Indexer
+  alias DataplaneEx.Indexer
 
   setup do
     did1 = "did:plc:firesim1"
