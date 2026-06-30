@@ -223,7 +223,6 @@ defmodule DataplaneEx.Indexer do
 
     validate_options!(opts, @supported_options)
     :persistent_term.put(@config_key, Map.new(opts))
-    DataplaneEx.Indexer.register_active(__MODULE__)
 
     :ets.new(@users_table, [:set, :named_table, :protected, read_concurrency: true])
 
