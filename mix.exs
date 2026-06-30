@@ -94,6 +94,7 @@ defmodule DataplaneEx.MixProject do
       ],
       precommit: [
         "compile --warnings-as-errors",
+        "dialyzer",
         "deps.unlock --unused",
         "format",
         "credo --all",
