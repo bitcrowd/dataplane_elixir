@@ -1,15 +1,6 @@
 defmodule DataplaneEx.Progress do
   @moduledoc """
-  Lightweight terminal progress reporting for bulk operations.
-
-  Provides three mechanisms:
-
-    - **Stream-based** (`each_with_progress/4`) — for Elixir-side iteration,
-      prints a `\\r`-overwriting line every ~1 second.
-    - **COPY polling** (`monitor_copy/1` + `stop_monitor/1`) — spawns a task
-      that polls `pg_stat_progress_copy` for server-side COPY operations.
-    - **CREATE INDEX polling** (`monitor_create_index/1` + `stop_monitor/1`) —
-      spawns a task that polls `pg_stat_progress_create_index` for index builds.
+  Terminal progress reporting for bulk operations.
   """
 
   require Logger
@@ -130,10 +121,6 @@ defmodule DataplaneEx.Progress do
     end)
   end
 
-  # ---------------------------------------------------------------------------
-  # COPY poller internals
-  # ---------------------------------------------------------------------------
-
   defp copy_poll_loop(parent, label, started_at) do
     receive do
       :stop ->
@@ -199,10 +186,6 @@ defmodule DataplaneEx.Progress do
       _ -> {0, 0.0}
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # CREATE INDEX poller internals
-  # ---------------------------------------------------------------------------
 
   defp index_poll_loop(parent, label, started_at) do
     receive do
@@ -284,10 +267,6 @@ defmodule DataplaneEx.Progress do
         nil
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # Formatting helpers
-  # ---------------------------------------------------------------------------
 
   defp print_progress(label, count, 0, started_at, now) do
     elapsed = now - started_at

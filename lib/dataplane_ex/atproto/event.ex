@@ -27,7 +27,7 @@ defmodule DataplaneEx.ATProto.Event do
         decode(rest, [decoded | decoded_acc])
 
       {:error, error} ->
-        Logger.error(error)
+        Logger.error("CBOR decode failed: #{inspect(error)}")
         {:ok, []}
     end
   end
@@ -42,7 +42,7 @@ defmodule DataplaneEx.ATProto.Event do
         Commit.to_event(commit)
 
       {:error, changeset} ->
-        Logger.error(changeset.errors)
+        Logger.error("invalid event: #{inspect(changeset.errors)}")
         []
     end
   end
@@ -57,7 +57,7 @@ defmodule DataplaneEx.ATProto.Event do
         Identity.to_event(identity)
 
       {:error, changeset} ->
-        Logger.error(changeset.errors)
+        Logger.error("invalid event: #{inspect(changeset.errors)}")
         []
     end
   end
@@ -72,7 +72,7 @@ defmodule DataplaneEx.ATProto.Event do
         Account.to_event(account)
 
       {:error, changeset} ->
-        Logger.error(changeset.errors)
+        Logger.error("invalid event: #{inspect(changeset.errors)}")
         []
     end
   end

@@ -35,3 +35,6 @@ dataplane_ex-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Dialyzer
+/priv/plts/*.plt
+/priv/plts/*.plt.hash

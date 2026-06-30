@@ -1,7 +1,6 @@
 defmodule DataplaneEx.CAR do
-  @moduledoc """
-  `Ecto.Type` for `CAR`
-  """
+  @moduledoc false
+
   use Ecto.Type
 
   def type, do: :map
@@ -15,7 +14,6 @@ defmodule DataplaneEx.CAR do
   def cast(bytes) do
     case DASL.CAR.DRISL.decode(bytes) do
       {:ok, car} -> {:ok, car}
-      {:error, _reason} -> :error
       {:error, _section, _reason} -> :error
     end
   end

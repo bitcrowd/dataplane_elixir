@@ -1,7 +1,6 @@
 defmodule DataplaneEx.CID do
-  @moduledoc """
-  `Ecto.Type` for `CID`
-  """
+  @moduledoc false
+
   use Ecto.Type
 
   def type, do: :binary

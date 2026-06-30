@@ -1,10 +1,6 @@
 defmodule DataplaneEx.Server do
   @moduledoc """
-  Behaviour defining the dataplane server interface.
-
-  Implementations provide the actual data access layer — Postgres, ETS,
-  in-memory, etc. The simulator calls into whichever implementation is
-  configured, allowing apples-to-apples performance comparison.
+  Dataplane server interface
   """
 
   @type user_id :: String.t()
@@ -12,8 +8,9 @@ defmodule DataplaneEx.Server do
   @type timeline_entry :: map()
   @type timeline_response :: {:ok, [timeline_entry()]} | {:error, term()}
 
-  @callback get_timeline(timeline_request()) :: timeline_response()
+  @callback get_timeline(timeline_request()) :: [timeline_entry()]
 
+  @spec get_timeline(timeline_request()) :: timeline_response()
   def get_timeline({user_id, _limit, _cursor} = request) do
     :telemetry.span([:dataplane_ex, :get_timeline], %{user_id: user_id}, fn ->
       result = server().get_timeline(request)
@@ -22,7 +19,7 @@ defmodule DataplaneEx.Server do
     end)
   end
 
-  def server do
+  defp server do
     Application.fetch_env!(:dataplane_ex, :server)
   end
 end

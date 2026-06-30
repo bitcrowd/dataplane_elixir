@@ -1,6 +1,6 @@
 defmodule DataplaneEx.Indexer.Postgres do
   @moduledoc """
-  Postgres-backed indexer implementation for users, follows, and posts.
+  Postgres implementation of the Dataplane Indexer.
   """
 
   @behaviour DataplaneEx.Indexer
@@ -346,13 +346,13 @@ defmodule DataplaneEx.Indexer.Postgres do
         toggle_follow(%{actor_id: did, subject_id: subject})
 
       _other ->
-        Logger.debug("unhandled commit event: #{event}")
+        Logger.debug("unhandled commit event: #{inspect(event)}")
         :ok
     end
   end
 
   defp index_event(event) do
-    Logger.debug("unhandled event: #{event}")
+    Logger.debug("unhandled event: #{inspect(event)}")
     :ok
   end
 end

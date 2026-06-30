@@ -1,6 +1,6 @@
 defmodule DataplaneEx.CSV do
   @moduledoc """
-  Lightweight CSV parsers for the simulator's data files.
+  CSV parsers for the simulator's data files.
 
   Each CSV may have a companion `.meta` file (same base name, `.meta` extension)
   containing key-value metadata such as `total: 40000000`.  Use `read_meta/1`
@@ -9,9 +9,6 @@ defmodule DataplaneEx.CSV do
 
   @doc """
   Reads the `.meta` companion file for `csv_path`.
-
-  Returns a map (e.g. `%{total: 40_000_000}`) or `%{}` when the file
-  is missing or unreadable.
   """
   @spec read_meta(String.t()) :: %{optional(atom()) => integer()}
   def read_meta(csv_path) do
@@ -25,8 +22,6 @@ defmodule DataplaneEx.CSV do
 
   @doc """
   Writes a `.meta` companion file next to `csv_path`.
-
-  `meta` is a map of atom keys to integer values, e.g. `%{total: 2_819_426}`.
   """
   @spec write_meta(String.t(), map()) :: :ok
   def write_meta(csv_path, meta) when is_map(meta) do
@@ -42,8 +37,9 @@ defmodule DataplaneEx.CSV do
     |> Enum.reduce(%{}, fn line, acc ->
       case String.split(line, ":", parts: 2) do
         [key, value] ->
-          key = key |> String.trim() |> String.to_atom()
+          key = key |> String.trim() |> String.to_existing_atom()
           value = value |> String.trim() |> String.to_integer()
+
           Map.put(acc, key, value)
 
         _ ->
@@ -53,7 +49,7 @@ defmodule DataplaneEx.CSV do
   end
 
   @doc """
-  Parses a user CSV (`user_id,follower_count,followers...`) into a stream of user IDs.
+  Parses a user CSV into a stream of user IDs.
   """
   @spec parse_users(String.t()) :: Enumerable.t()
   def parse_users(content) when is_binary(content) do
@@ -76,7 +72,7 @@ defmodule DataplaneEx.CSV do
   end
 
   @doc """
-  Parses an edge-list CSV (`actor_id,subject_id`) into a stream of tuples.
+  Parses an edges CSV into a stream of tuples.
   """
   @spec parse_edges(String.t()) :: Enumerable.t()
   def parse_edges(content) when is_binary(content) do
@@ -99,7 +95,7 @@ defmodule DataplaneEx.CSV do
   end
 
   @doc """
-  Parses a posts CSV (`offset_ms,user_id`) into a stream of `{offset_ms, user_id}` tuples.
+  Parses a posts CSV into a stream of `{offset_ms, user_id}` tuples.
   """
   @spec parse_posts(String.t()) :: Enumerable.t()
   def parse_posts(content) when is_binary(content) do
