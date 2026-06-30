@@ -45,6 +45,7 @@ defmodule DataplaneEx.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:ecto, "~> 3.14"},
       {:dasl, "~> 0.1"},
       {:websockex, "~> 0.5.1"},
       {:phoenix, "~> 1.8.5"},
@@ -82,10 +83,8 @@ defmodule DataplaneEx.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
-      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
-      "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      setup: ["deps.get", "assets.setup", "assets.build"],
+      test: ["test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind dataplane_ex", "esbuild dataplane_ex"],
       "assets.deploy": [
