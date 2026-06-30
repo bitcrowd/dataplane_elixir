@@ -1,33 +1,28 @@
 defmodule DataplaneExWeb.TimelineControllerTest do
   use DataplaneExWeb.ConnCase, async: false
 
-  alias DataplaneEx.Indexer.ETS
+  alias DataplaneEx.Indexer
 
   @moduletag :capture_log
 
   setup do
-    start_supervised!(ETS)
-    Application.put_env(:dataplane_ex, :server, DataplaneEx.Server.ETS)
+    start_supervised!(Indexer)
 
     did1 = "did:plc:firesim1"
     did2 = "did:plc:firesim2"
     did3 = "did:plc:firesim3"
     did4 = "did:plc:firesim4"
 
-    :ok = ETS.bulk_users(users_csv(did1, did2, did3, did4))
-    :ok = ETS.bulk_follows(follows_csv(did1, did2, did3, did4))
-
-    on_exit(fn ->
-      Application.delete_env(:dataplane_ex, :server)
-    end)
+    :ok = Indexer.bulk_users(users_csv(did1, did2, did3, did4))
+    :ok = Indexer.bulk_follows(follows_csv(did1, did2, did3, did4))
 
     :ok
   end
 
   test "returns timeline items for the supplied actor_did", %{conn: conn} do
-    ETS.create_post(%{user_id: "did:plc:firesim2"})
-    ETS.create_post(%{user_id: "did:plc:firesim3"})
-    ETS.create_post(%{user_id: "did:plc:firesim2"})
+    Indexer.create_post(%{user_id: "did:plc:firesim2"})
+    Indexer.create_post(%{user_id: "did:plc:firesim3"})
+    Indexer.create_post(%{user_id: "did:plc:firesim2"})
 
     conn = post(conn, ~p"/bsky.Service/GetTimeline", actor_did: "did:plc:firesim3", limit: 2)
 
