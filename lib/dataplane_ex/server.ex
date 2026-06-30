@@ -26,7 +26,4 @@ defmodule DataplaneEx.Server do
     end)
   end
 
-  defp server do
-    Application.fetch_env!(:dataplane_ex, :server)
-  end
 end

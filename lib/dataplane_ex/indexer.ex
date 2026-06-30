@@ -22,8 +22,6 @@ defmodule DataplaneEx.Indexer do
 
   require Logger
 
-  @behaviour DataplaneEx.Indexer
-
   @users_table :social_graph_users
   @followers_table :social_graph_followers
   @following_table :social_graph_following
@@ -47,17 +45,14 @@ defmodule DataplaneEx.Indexer do
     end
   end
 
-  @impl DataplaneEx.Indexer
   def bulk_users(source, opts \\ []) do
     GenServer.call(__MODULE__, {:bulk_users, source, opts}, :infinity)
   end
 
-  @impl DataplaneEx.Indexer
   def bulk_follows(source, opts \\ []) do
     GenServer.call(__MODULE__, {:bulk_follows, source, opts}, :infinity)
   end
 
-  @impl DataplaneEx.Indexer
   def bulk_load_posts(source, opts \\ []) do
     GenServer.call(__MODULE__, {:bulk_load_posts, source, opts}, :infinity)
   end
@@ -80,29 +75,24 @@ defmodule DataplaneEx.Indexer do
     |> bulk_load_posts(Keyword.put_new(opts, :total, total_from_file(path)))
   end
 
-  @impl DataplaneEx.Indexer
   def vacuum do
     GenServer.call(__MODULE__, :vacuum)
   end
 
-  @impl DataplaneEx.Indexer
   def count_users do
     :ets.info(@users_table, :size)
   end
 
-  @impl DataplaneEx.Indexer
   def count_follows do
     :ets.info(@following_table, :size)
   end
 
-  @impl DataplaneEx.Indexer
   def followers(user_id) do
     @followers_table
     |> :ets.lookup(user_id)
     |> Enum.map(&elem(&1, 1))
   end
 
-  @impl DataplaneEx.Indexer
   def create_post(%{user_id: user_id}) do
     :atomics.add(:persistent_term.get(@posts_planned_counter_key), 1, 1)
     post_id = next_post_id()
@@ -110,7 +100,6 @@ defmodule DataplaneEx.Indexer do
     :ok
   end
 
-  @impl DataplaneEx.Indexer
   def toggle_follow(%{actor_id: actor_id, subject_id: subject_id}) do
     do_toggle_follow(actor_id, subject_id)
     :ok
@@ -133,17 +122,14 @@ defmodule DataplaneEx.Indexer do
     end
   end
 
-  @impl DataplaneEx.Indexer
   def posts_planned do
     :atomics.get(:persistent_term.get(@posts_planned_counter_key), 1)
   end
 
-  @impl DataplaneEx.Indexer
   def posts_created do
     :ets.info(@posts_table, :size)
   end
 
-  @impl DataplaneEx.Indexer
   def following(user_id) do
     @following_table
     |> :ets.lookup(user_id)
