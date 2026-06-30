@@ -9,12 +9,6 @@ You must set the following environment variables according to your setup.
 * `BSKY_DATAPLANE_PORT`
 * `BSKY_RELAY_WEBSOCKET`
 
-By default the project will use the ETS-based implementation.
-
-If you want to run the Postgres-based implementation you must also set the following environment variables.
-
-* `BSKY_DB_POSTGRES_URL`
-
 To start your Phoenix server:
 
 * Run `MIX_ENV=prod mix setup` to install and setup dependencies
@@ -52,7 +46,7 @@ MIX_ENV=prod iex -S mix phx.server
 Then run:
 
 ```elixir
-alias DataplaneEx.Indexer.ETS, as: Indexer
+alias DataplaneEx.Indexer
 
 Indexer.bulk_users_from_file("/path/to/users.csv")
 Indexer.bulk_follows_from_file("/path/to/follows.csv")
