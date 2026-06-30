@@ -33,33 +33,6 @@ if config_env() == :prod do
 
   config :dataplane_ex, bsky_relay_websocket: bsky_relay_websocket
 
-  database_url =
-    System.get_env("BSKY_DB_POSTGRES_URL") ||
-      raise """
-      environment variable BSKY_DB_POSTGRES_URL is missing.
-      For example: ecto://USER:PASS@HOST/DATABASE
-      """
-
-  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
-
-  config :dataplane_ex, DataplaneEx.Repo,
-    # ssl: true,
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    # For machines with several cores, consider starting multiple pools of `pool_size`
-    # pool_count: 4,
-    socket_options: maybe_ipv6
-
-  # WriteRepo — separate pool for post/follow writes so they don't starve
-  # the read-heavy get_timeline path. Queue settings are relaxed compared to
-  # Repo because writes are bursty (batch concurrency can exceed pool_size)
-  # and individual transactions are slower (WAL, index updates).
-  config :dataplane_ex, DataplaneEx.WriteRepo,
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("DB_WRITE_POOL_SIZE", "20")),
-    queue_target: 2_000,
-    queue_interval: 5_000
-
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
   # want to use a different value for prod and you most likely don't want

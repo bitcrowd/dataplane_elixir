@@ -7,11 +7,7 @@
 # General application configuration
 import Config
 
-config :dataplane_ex,
-  ecto_repos: [DataplaneEx.Repo, DataplaneEx.WriteRepo],
-  generators: [timestamp_type: :utc_datetime],
-  server: DataplaneEx.Server.ETS,
-  write_repo: DataplaneEx.WriteRepo
+config :dataplane_ex, generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
 config :dataplane_ex, DataplaneExWeb.Endpoint,

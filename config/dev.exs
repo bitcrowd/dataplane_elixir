@@ -4,25 +4,6 @@ config :dataplane_ex,
   bsky_relay_websocket: System.get_env("BSKY_RELAY_WEBSOCKET") || "ws://localhost:4000",
   indexer: DataplaneEx.Indexer.ETS
 
-# Configure your database
-config :dataplane_ex, DataplaneEx.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "dataplane_ex_dev",
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
-
-config :dataplane_ex, DataplaneEx.WriteRepo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "dataplane_ex_dev",
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
-
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #
