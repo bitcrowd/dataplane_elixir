@@ -10,11 +10,9 @@ defmodule DataplaneEx.Application do
     children =
       [
         DataplaneExWeb.Telemetry,
-        DataplaneEx.Repo,
-        DataplaneEx.WriteRepo,
         {DNSCluster, query: Application.get_env(:dataplane_ex, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: DataplaneEx.PubSub},
-        dataplane_indexer(),
+        indexer(),
         DataplaneExWeb.Endpoint,
         sync_client()
       ]
@@ -34,8 +32,8 @@ defmodule DataplaneEx.Application do
     :ok
   end
 
-  def dataplane_indexer() do
-    Application.get_env(:dataplane_ex, :indexer, DataplaneEx.Indexer.ETS)
+  def indexer() do
+    if Application.get_env(:dataplane_ex, :start_indexer, true), do: DataplaneEx.Indexer
   end
 
   def sync_client() do

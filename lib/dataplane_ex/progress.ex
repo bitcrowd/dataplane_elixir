@@ -71,203 +71,6 @@ defmodule DataplaneEx.Progress do
     :ok
   end
 
-  @doc """
-  Spawns a poller that queries `pg_stat_progress_copy` every second and
-  prints COPY progress. Returns a reference to pass to `stop_monitor/1`.
-
-  The poller uses a separate Repo connection from the pool.
-  """
-  def monitor_copy(label) do
-    parent = self()
-    started_at = System.monotonic_time(:millisecond)
-
-    pid =
-      spawn_link(fn ->
-        copy_poll_loop(parent, label, started_at)
-      end)
-
-    pid
-  end
-
-  @doc "Stops the COPY monitor and prints the final summary line."
-  def stop_monitor(pid) do
-    send(pid, :stop)
-
-    receive do
-      {:progress_stopped, final_tuples, elapsed_ms} ->
-        if final_tuples > 0 do
-          rate = rate_string(final_tuples, elapsed_ms)
-
-          Logger.info(
-            "\r\e[2K#{format_number(final_tuples)} rows — #{rate} — #{format_duration(elapsed_ms)}\n"
-          )
-        end
-    after
-      2_000 -> :ok
-    end
-  end
-
-  @doc """
-  Spawns a poller that queries `pg_stat_progress_create_index` every second
-  and prints index-build progress (phase, tuples, blocks). Returns a pid
-  to pass to `stop_monitor/1`.
-  """
-  def monitor_create_index(label) do
-    parent = self()
-    started_at = System.monotonic_time(:millisecond)
-
-    spawn_link(fn ->
-      index_poll_loop(parent, label, started_at)
-    end)
-  end
-
-  defp copy_poll_loop(parent, label, started_at) do
-    receive do
-      :stop ->
-        now = System.monotonic_time(:millisecond)
-        send(parent, {:progress_stopped, 0, now - started_at})
-    after
-      @print_interval_ms ->
-        {tuples, bytes_pct} = query_copy_progress()
-        now = System.monotonic_time(:millisecond)
-        elapsed = now - started_at
-
-        if tuples > 0 do
-          rate = rate_string(tuples, elapsed)
-
-          eta =
-            if bytes_pct > 0.0 do
-              remaining_ms = trunc(elapsed / bytes_pct * (1.0 - bytes_pct))
-              " — ETA #{format_duration(remaining_ms)}"
-            else
-              ""
-            end
-
-          Logger.info(
-            "\r\e[2K#{label}: #{format_number(tuples)} rows (#{Float.round(bytes_pct * 100, 1)}%) — #{rate}#{eta}"
-          )
-        end
-
-        wait_or_stop(parent, label, started_at, tuples)
-    end
-  end
-
-  defp wait_or_stop(parent, label, started_at, last_tuples) do
-    receive do
-      :stop ->
-        Logger.info("\r\e[2K")
-        now = System.monotonic_time(:millisecond)
-        send(parent, {:progress_stopped, last_tuples, now - started_at})
-    after
-      0 -> copy_poll_loop(parent, label, started_at)
-    end
-  end
-
-  defp query_copy_progress do
-    try do
-      result =
-        DataplaneEx.Repo.query!(
-          "SELECT tuples_processed, bytes_processed, bytes_total FROM pg_stat_progress_copy LIMIT 1",
-          [],
-          timeout: 5_000
-        )
-
-      case result.rows do
-        [[tuples, bytes_done, bytes_total]] when bytes_total > 0 ->
-          {tuples, bytes_done / bytes_total}
-
-        [[tuples, _bytes_done, _bytes_total]] ->
-          {tuples, 0.0}
-
-        [] ->
-          {0, 0.0}
-      end
-    rescue
-      _ -> {0, 0.0}
-    end
-  end
-
-  defp index_poll_loop(parent, label, started_at) do
-    receive do
-      :stop ->
-        now = System.monotonic_time(:millisecond)
-        send(parent, {:progress_stopped, 0, now - started_at})
-    after
-      @print_interval_ms ->
-        progress = query_index_progress()
-        now = System.monotonic_time(:millisecond)
-        elapsed = now - started_at
-
-        print_index_progress(label, progress, elapsed)
-
-        index_wait_or_stop(parent, label, started_at, progress)
-    end
-  end
-
-  defp index_wait_or_stop(parent, label, started_at, last_progress) do
-    receive do
-      :stop ->
-        Logger.info("\r\e[2K")
-        now = System.monotonic_time(:millisecond)
-        tuples = last_progress[:tuples_done] || 0
-        send(parent, {:progress_stopped, tuples, now - started_at})
-    after
-      0 -> index_poll_loop(parent, label, started_at)
-    end
-  end
-
-  defp print_index_progress(_label, nil, _elapsed), do: :ok
-
-  defp print_index_progress(label, progress, elapsed) do
-    phase = progress.phase
-    tuples_done = progress.tuples_done
-    tuples_total = progress.tuples_total
-    blocks_done = progress.blocks_done
-    blocks_total = progress.blocks_total
-
-    pct_part =
-      cond do
-        tuples_total > 0 ->
-          pct = Float.round(tuples_done / tuples_total * 100, 1)
-          " #{format_number(tuples_done)}/#{format_number(tuples_total)} tuples (#{pct}%)"
-
-        blocks_total > 0 ->
-          pct = Float.round(blocks_done / blocks_total * 100, 1)
-          " #{format_number(blocks_done)}/#{format_number(blocks_total)} blocks (#{pct}%)"
-
-        tuples_done > 0 ->
-          " #{format_number(tuples_done)} tuples"
-
-        true ->
-          ""
-      end
-
-    Logger.info("\r\e[2K#{label}: #{phase}#{pct_part} — #{format_duration(elapsed)}")
-  end
-
-  defp query_index_progress do
-    result =
-      DataplaneEx.Repo.query!(
-        "SELECT phase, tuples_total, tuples_done, blocks_total, blocks_done FROM pg_stat_progress_create_index LIMIT 1",
-        [],
-        timeout: 5_000
-      )
-
-    case result.rows do
-      [[phase, tuples_total, tuples_done, blocks_total, blocks_done]] ->
-        %{
-          phase: phase,
-          tuples_total: tuples_total,
-          tuples_done: tuples_done,
-          blocks_total: blocks_total,
-          blocks_done: blocks_done
-        }
-
-      [] ->
-        nil
-    end
-  end
-
   defp print_progress(label, count, 0, started_at, now) do
     elapsed = now - started_at
     rate = rate_string(count, elapsed)
@@ -339,5 +142,30 @@ defmodule DataplaneEx.Progress do
     minutes = div(ms, 60_000)
     seconds = div(rem(ms, 60_000), 1_000)
     "#{minutes}m #{seconds}s"
+  end
+
+  def total_from_file(path) do
+    DataplaneEx.CSV.read_meta(path)[:total] || count_lines(path)
+  end
+
+  def total_from_source(source, opts) when is_binary(source) do
+    Keyword.get_lazy(opts, :total, fn -> line_count(source) end)
+  end
+
+  def total_from_source(_source, opts) do
+    Keyword.get(opts, :total, 0)
+  end
+
+  def line_count(contents) do
+    lines =
+      contents
+      |> String.split("\n", trim: true)
+      |> length()
+
+    if lines > 0 do
+      lines - 1
+    else
+      0
+    end
   end
 end
