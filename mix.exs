@@ -94,6 +94,7 @@ defmodule DataplaneEx.MixProject do
         "phx.digest"
       ],
       precommit: [
+        "hex.audit",
         "compile --warnings-as-errors",
         "dialyzer",
         "deps.unlock --unused",
