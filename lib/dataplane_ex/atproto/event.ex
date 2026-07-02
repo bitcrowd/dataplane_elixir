@@ -10,10 +10,28 @@ defmodule DataplaneEx.ATProto.Event do
   @spec decode(binary()) :: map() | [map()]
   def decode(event) when is_binary(event) do
     case decode(event, []) do
-      {:ok, [%{"t" => "#commit"} | _rest] = event} -> decode_commit(event)
-      {:ok, [%{"t" => "#identity"} | _rest] = event} -> decode_identity(event)
-      {:ok, [%{"t" => "#account"} | _rest] = event} -> decode_account(event)
-      {:ok, [%{"t" => "#error"} | _rest] = event} -> decode_error(event)
+      {:ok, [%{"t" => "#commit"} | _rest] = event} ->
+        decode_commit(event)
+
+      {:ok, [%{"t" => "#identity"} | _rest] = event} ->
+        decode_identity(event)
+
+      {:ok, [%{"t" => "#account"} | _rest] = event} ->
+        decode_account(event)
+
+      {:ok, [%{"t" => "#error"} | _rest] = event} ->
+        decode_error(event)
+
+      {:ok, [%{"op" => -1} | _rest] = event} ->
+        decode_error(event)
+
+      {:ok, event} ->
+        Logger.debug("ignoring unknown event: #{inspect(event)}")
+        []
+
+      {:error, reason} ->
+        Logger.error("CBOR decode failed: #{inspect(reason)}")
+        []
     end
   end
 
@@ -23,12 +41,8 @@ defmodule DataplaneEx.ATProto.Event do
 
   defp decode(binary, decoded_acc) do
     case CBOR.decode(binary) do
-      {:ok, decoded, rest} ->
-        decode(rest, [decoded | decoded_acc])
-
-      {:error, error} ->
-        Logger.error("CBOR decode failed: #{inspect(error)}")
-        {:ok, []}
+      {:ok, decoded, rest} -> decode(rest, [decoded | decoded_acc])
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -77,5 +91,8 @@ defmodule DataplaneEx.ATProto.Event do
     end
   end
 
-  defp decode_error(event), do: event
+  defp decode_error(event) do
+    Logger.error("error event received: #{inspect(event)}")
+    []
+  end
 end
