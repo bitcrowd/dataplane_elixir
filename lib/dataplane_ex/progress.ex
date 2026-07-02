@@ -12,6 +12,7 @@ defmodule DataplaneEx.Progress do
 
   Reads in 256 KB binary chunks and counts newline characters.
   """
+  @spec count_lines(Path.t()) :: non_neg_integer()
   def count_lines(filepath) do
     lines =
       filepath
@@ -47,6 +48,13 @@ defmodule DataplaneEx.Progress do
     - `:step` — count increment per element (default `1`). Use this when
       iterating batches but tracking individual row counts.
   """
+  @spec each_with_progress(
+          Enumerable.t(),
+          non_neg_integer(),
+          String.t(),
+          (term() -> any()),
+          keyword()
+        ) :: :ok
   def each_with_progress(enumerable, total, label, fun, opts \\ []) do
     step = Keyword.get(opts, :step, 1)
     started_at = System.monotonic_time(:millisecond)
@@ -74,7 +82,7 @@ defmodule DataplaneEx.Progress do
   defp print_progress(label, count, 0, started_at, now) do
     elapsed = now - started_at
     rate = rate_string(count, elapsed)
-    Logger.info("\r\e[2K#{label}: #{format_number(count)} rows — #{rate}")
+    Logger.info("#{label}: #{format_number(count)} rows — #{rate}")
   end
 
   defp print_progress(label, count, total, started_at, now) do
@@ -91,7 +99,7 @@ defmodule DataplaneEx.Progress do
       end
 
     Logger.info(
-      "\r\e[2K#{label}: #{format_number(count)} / #{format_number(total)} (#{pct}%) — #{rate}#{eta}"
+      "#{label}: #{format_number(count)} / #{format_number(total)} (#{pct}%) — #{rate}#{eta}"
     )
   end
 
@@ -99,9 +107,7 @@ defmodule DataplaneEx.Progress do
     elapsed = System.monotonic_time(:millisecond) - started_at
     rate = rate_string(count, elapsed)
 
-    Logger.info(
-      "\r\e[2K#{label}: #{format_number(count)} rows — #{rate} — #{format_duration(elapsed)}\n"
-    )
+    Logger.info("#{label}: #{format_number(count)} rows — #{rate} — #{format_duration(elapsed)}")
   end
 
   defp rate_string(_count, elapsed) when elapsed <= 0, do: "—"
@@ -144,10 +150,12 @@ defmodule DataplaneEx.Progress do
     "#{minutes}m #{seconds}s"
   end
 
+  @spec total_from_file(Path.t()) :: non_neg_integer()
   def total_from_file(path) do
     DataplaneEx.CSV.read_meta(path)[:total] || count_lines(path)
   end
 
+  @spec total_from_source(Enumerable.t() | String.t(), keyword()) :: non_neg_integer()
   def total_from_source(source, opts) when is_binary(source) do
     Keyword.get_lazy(opts, :total, fn -> line_count(source) end)
   end
@@ -156,6 +164,7 @@ defmodule DataplaneEx.Progress do
     Keyword.get(opts, :total, 0)
   end
 
+  @spec line_count(String.t()) :: non_neg_integer()
   def line_count(contents) do
     lines =
       contents

@@ -8,6 +8,7 @@ defmodule DataplaneEx.ATProto.Event do
 
   require Logger
 
+  @spec decode(binary()) :: map() | [map()]
   def decode(event) when is_binary(event) do
     case decode(event, []) do
       {:ok, [%{"t" => "#commit"} | _rest] = event} -> decode_commit(event)

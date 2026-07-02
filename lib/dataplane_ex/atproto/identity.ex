@@ -1,8 +1,7 @@
 defmodule DataplaneEx.ATProto.Identity do
-  import Ecto.Changeset
   use Ecto.Schema
 
-  alias DataplaneEx.ATProto.Identity
+  import Ecto.Changeset
 
   # spec: https://atproto.com/specs/sync#identity-events
   @primary_key false
@@ -18,13 +17,13 @@ defmodule DataplaneEx.ATProto.Identity do
   @attrs @required_attrs ++ [:handle]
 
   @doc false
-  def changeset(%Identity{} = identity, attrs) do
+  def changeset(%__MODULE__{} = identity, attrs) do
     identity
     |> cast(attrs, @attrs)
     |> validate_required(@required_attrs)
   end
 
-  def to_event(%Identity{} = identity) do
+  def to_event(%__MODULE__{} = identity) do
     %{did: did, seq: seq, handle: handle, time: time} = identity
 
     kind = :identity

@@ -36,6 +36,11 @@ defmodule DataplaneEx.Indexer do
   @supported_options [:fan_out_limit]
   @config_key :indexer_ets_config
 
+  @type user_id :: String.t()
+  @type post_id :: pos_integer()
+  @type source :: Enumerable.t() | String.t()
+
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -47,54 +52,65 @@ defmodule DataplaneEx.Indexer do
     end
   end
 
+  @spec bulk_users(source(), keyword()) :: :ok
   def bulk_users(source, opts \\ []) do
     GenServer.call(__MODULE__, {:bulk_users, source, opts}, :infinity)
   end
 
+  @spec bulk_follows(source(), keyword()) :: :ok
   def bulk_follows(source, opts \\ []) do
     GenServer.call(__MODULE__, {:bulk_follows, source, opts}, :infinity)
   end
 
+  @spec bulk_load_posts(source(), keyword()) :: :ok
   def bulk_load_posts(source, opts \\ []) do
     GenServer.call(__MODULE__, {:bulk_load_posts, source, opts}, :infinity)
   end
 
+  @spec bulk_users_from_file(Path.t(), keyword()) :: :ok
   def bulk_users_from_file(path, opts \\ []) do
     path
     |> File.stream!()
     |> bulk_users(Keyword.put_new(opts, :total, Progress.total_from_file(path)))
   end
 
+  @spec bulk_follows_from_file(Path.t(), keyword()) :: :ok
   def bulk_follows_from_file(path, opts \\ []) do
     path
     |> File.stream!()
     |> bulk_follows(Keyword.put_new(opts, :total, Progress.total_from_file(path)))
   end
 
+  @spec bulk_load_posts_from_file(Path.t(), keyword()) :: :ok
   def bulk_load_posts_from_file(path, opts \\ []) do
     path
     |> File.stream!()
     |> bulk_load_posts(Keyword.put_new(opts, :total, Progress.total_from_file(path)))
   end
 
+  @spec vacuum() :: :ok
   def vacuum do
     GenServer.call(__MODULE__, :vacuum)
   end
 
+  @spec count_users() :: non_neg_integer()
   def count_users do
     :ets.info(@users_table, :size)
   end
 
+  @spec count_follows() :: non_neg_integer()
   def count_follows do
     :ets.info(@following_table, :size)
   end
 
+  @spec followers(user_id()) :: [user_id()]
   def followers(user_id) do
     @followers_table
     |> :ets.lookup(user_id)
     |> Enum.map(&elem(&1, 1))
   end
 
+  @spec create_post(%{required(:user_id) => user_id()}) :: :ok
   def create_post(%{user_id: user_id}) do
     :atomics.add(:persistent_term.get(@posts_planned_counter_key), 1, 1)
     post_id = next_post_id()
@@ -102,6 +118,8 @@ defmodule DataplaneEx.Indexer do
     :ok
   end
 
+  @spec toggle_follow(%{required(:actor_id) => user_id(), required(:subject_id) => user_id()}) ::
+          :ok
   def toggle_follow(%{actor_id: actor_id, subject_id: subject_id}) do
     do_toggle_follow(actor_id, subject_id)
     :ok
@@ -124,24 +142,29 @@ defmodule DataplaneEx.Indexer do
     end
   end
 
+  @spec posts_planned() :: non_neg_integer()
   def posts_planned do
     :atomics.get(:persistent_term.get(@posts_planned_counter_key), 1)
   end
 
+  @spec posts_created() :: non_neg_integer()
   def posts_created do
     :ets.info(@posts_table, :size)
   end
 
+  @spec following(user_id()) :: [user_id()]
   def following(user_id) do
     @following_table
     |> :ets.lookup(user_id)
     |> Enum.map(&elem(&1, 1))
   end
 
+  @spec user_exists?(user_id()) :: boolean()
   def user_exists?(user_id) do
     :ets.member(@users_table, user_id)
   end
 
+  @spec next_post_id() :: post_id()
   def next_post_id do
     :atomics.add_get(:persistent_term.get(@post_id_counter_key), 1, 1)
   end
@@ -149,6 +172,7 @@ defmodule DataplaneEx.Indexer do
   @doc """
   Insert a post and fan it out to the feeds of all the author's followers.
   """
+  @spec insert_post(post_id(), user_id()) :: :ok
   def insert_post(post_id, author_id) do
     :ets.insert(@posts_table, {post_id, author_id})
 
@@ -162,15 +186,20 @@ defmodule DataplaneEx.Indexer do
     else
       :ets.insert(@celebrity_posts_table, {author_id, post_id})
     end
+
+    :ok
   end
 
+  @spec insert_feed_entry(user_id(), post_id()) :: :ok
   def insert_feed_entry(user_id, post_id) do
     :ets.insert(@feeds_table, {user_id, post_id})
+    :ok
   end
 
   @doc """
   Return the list of post IDs in a user's feed.
   """
+  @spec get_timeline(user_id()) :: [post_id()]
   def get_timeline(user_id) do
     fan_out_posts =
       @feeds_table
