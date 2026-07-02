@@ -15,12 +15,6 @@ defmodule DataplaneExWeb.Router do
   end
 
   scope "/", DataplaneExWeb do
-    pipe_through :browser
-
-    get "/", PageController, :home
-  end
-
-  scope "/", DataplaneExWeb do
     pipe_through :api
 
     post "/bsky.Service/GetTimeline", TimelineController, :timeline
