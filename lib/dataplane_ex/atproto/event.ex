@@ -5,7 +5,6 @@ defmodule DataplaneEx.ATProto.Event do
 
   alias DataplaneEx.ATProto.{Account, Commit, Identity}
   alias Ecto.Changeset
-
   require Logger
 
   @spec decode(binary()) :: map() | [map()]

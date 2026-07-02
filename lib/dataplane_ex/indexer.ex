@@ -19,9 +19,7 @@ defmodule DataplaneEx.Indexer do
   `:persistent_term` for lock-free access from any process.
   """
   use GenServer
-
   alias DataplaneEx.Progress
-
   require Logger
 
   @users_table :social_graph_users

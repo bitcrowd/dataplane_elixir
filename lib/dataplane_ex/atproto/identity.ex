@@ -1,6 +1,5 @@
 defmodule DataplaneEx.ATProto.Identity do
   use Ecto.Schema
-
   import Ecto.Changeset
 
   # spec: https://atproto.com/specs/sync#identity-events

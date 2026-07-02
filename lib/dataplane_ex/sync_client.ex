@@ -4,9 +4,7 @@ defmodule DataplaneEx.SyncClient do
   """
 
   use WebSockex
-
   alias Phoenix.PubSub
-
   require Logger
 
   @spec start_link(keyword()) :: {:ok, pid()} | {:error, term()}

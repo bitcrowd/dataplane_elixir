@@ -1,6 +1,6 @@
 defmodule DataplaneEx.IndexerTest do
   use ExUnit.Case, async: false
-
+  import DataplaneEx.CSVFixtures
   alias DataplaneEx.Indexer
 
   setup do
@@ -13,7 +13,7 @@ defmodule DataplaneEx.IndexerTest do
 
     %{
       users_csv: users_csv(did1, did2, did3, did4),
-      edges_csv: edges_csv(did1, did2, did3, did4),
+      follows_csv: follows_csv(did1, did2, did3, did4),
       did1: did1,
       did2: did2,
       did3: did3,
@@ -34,30 +34,30 @@ defmodule DataplaneEx.IndexerTest do
   end
 
   describe "bulk_follows/1" do
-    test "inserts all follow edges from CSV", %{users_csv: users_csv, edges_csv: edges_csv} do
+    test "inserts all follow edges from CSV", %{users_csv: users_csv, follows_csv: follows_csv} do
       Indexer.bulk_users(users_csv)
 
-      assert :ok = Indexer.bulk_follows(edges_csv)
+      assert :ok = Indexer.bulk_follows(follows_csv)
       assert Indexer.count_follows() == 4
     end
 
-    test "accepts a CSV stream", %{users_csv: users_csv, edges_csv: edges_csv} do
+    test "accepts a CSV stream", %{users_csv: users_csv, follows_csv: follows_csv} do
       Indexer.bulk_users(users_csv)
 
-      assert :ok = Indexer.bulk_follows(String.splitter(edges_csv, "\n", trim: false))
+      assert :ok = Indexer.bulk_follows(String.splitter(follows_csv, "\n", trim: false))
       assert Indexer.count_follows() == 4
     end
 
     test "populates followers table correctly", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
       did4: did4
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       assert Enum.sort(Indexer.followers(did1)) == [did2, did3, did4]
       assert Indexer.followers(did2) == [did3]
@@ -67,14 +67,14 @@ defmodule DataplaneEx.IndexerTest do
 
     test "populates following table correctly", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
       did4: did4
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       assert Indexer.following(did1) == []
       assert Indexer.following(did2) == [did1]
@@ -84,9 +84,9 @@ defmodule DataplaneEx.IndexerTest do
   end
 
   describe "bulk_load_posts/2" do
-    setup %{users_csv: users_csv, edges_csv: edges_csv} do
+    setup %{users_csv: users_csv, follows_csv: follows_csv} do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       %{posts_csv: posts_csv("did:plc:firesim1", "did:plc:firesim2")}
     end
@@ -119,9 +119,9 @@ defmodule DataplaneEx.IndexerTest do
 
   describe "toggle_follow/1" do
     test "toggles an existing relationship off and then on",
-         %{users_csv: users_csv, edges_csv: edges_csv, did1: did1, did2: did2} do
+         %{users_csv: users_csv, follows_csv: follows_csv, did1: did1, did2: did2} do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       assert Indexer.following(did2) == [did1]
       assert :ok = Indexer.toggle_follow(%{actor_id: did2, subject_id: did1})
@@ -137,12 +137,12 @@ defmodule DataplaneEx.IndexerTest do
   describe "vacuum/0" do
     test "removes all data and resets post counter", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
       Indexer.insert_post(Indexer.next_post_id(), did1)
       Indexer.insert_post(Indexer.next_post_id(), did2)
 
@@ -175,14 +175,14 @@ defmodule DataplaneEx.IndexerTest do
   describe "create_post/1" do
     test "creates a post and fans out to followers", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
       did4: did4
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       assert :ok = Indexer.create_post(%{user_id: did1})
 
@@ -193,14 +193,14 @@ defmodule DataplaneEx.IndexerTest do
 
     test "returns :ok for user with no followers", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
       did4: did4
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       assert :ok = Indexer.create_post(%{user_id: did4})
 
@@ -237,14 +237,14 @@ defmodule DataplaneEx.IndexerTest do
 
     test "fans out to followers' feeds", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
       did4: did4
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       p1 = Indexer.next_post_id()
       Indexer.insert_post(p1, did1)
@@ -257,14 +257,14 @@ defmodule DataplaneEx.IndexerTest do
 
     test "fans out to correct followers for different authors", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
       did4: did4
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       p1 = Indexer.next_post_id()
       p2 = Indexer.next_post_id()
@@ -285,11 +285,11 @@ defmodule DataplaneEx.IndexerTest do
     test "skips fan-out and stores in celebrity_posts when follower count exceeds fan_out_limit",
          %{
            users_csv: users_csv,
-           edges_csv: edges_csv,
+           follows_csv: follows_csv,
            did1: did1
          } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       post_id = Indexer.next_post_id()
       Indexer.insert_post(post_id, did1)
@@ -301,12 +301,12 @@ defmodule DataplaneEx.IndexerTest do
 
     test "allows fan-out when follower count is within fan_out_limit", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did2: did2,
       did3: did3
     } do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       # User 2 has 1 follower — within limit, fan-out happens
       post_id = Indexer.next_post_id()
@@ -316,7 +316,7 @@ defmodule DataplaneEx.IndexerTest do
 
     test "fan-out works normally when fan_out_limit is not configured", %{
       users_csv: users_csv,
-      edges_csv: edges_csv,
+      follows_csv: follows_csv,
       did1: did1,
       did2: did2,
       did3: did3,
@@ -325,7 +325,7 @@ defmodule DataplaneEx.IndexerTest do
       :persistent_term.put(:indexer_ets_config, %{})
 
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       Indexer.insert_post(Indexer.next_post_id(), did1)
       assert [_] = Indexer.get_timeline(did2)
@@ -358,9 +358,9 @@ defmodule DataplaneEx.IndexerTest do
   end
 
   describe "get_timeline/1 with celebrity posts" do
-    setup %{users_csv: users_csv, edges_csv: edges_csv} do
+    setup %{users_csv: users_csv, follows_csv: follows_csv} do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
       :ok
     end
 
@@ -413,9 +413,9 @@ defmodule DataplaneEx.IndexerTest do
       assert Indexer.posts_planned() == 0
     end
 
-    test "increments on each create_post call", %{users_csv: users_csv, edges_csv: edges_csv} do
+    test "increments on each create_post call", %{users_csv: users_csv, follows_csv: follows_csv} do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       Indexer.create_post(%{user_id: 1})
       assert Indexer.posts_planned() == 1
@@ -424,9 +424,9 @@ defmodule DataplaneEx.IndexerTest do
       assert Indexer.posts_planned() == 2
     end
 
-    test "increments even for celebrity posts", %{users_csv: users_csv, edges_csv: edges_csv} do
+    test "increments even for celebrity posts", %{users_csv: users_csv, follows_csv: follows_csv} do
       Indexer.bulk_users(users_csv)
-      Indexer.bulk_follows(edges_csv)
+      Indexer.bulk_follows(follows_csv)
 
       Indexer.create_post(%{user_id: 1})
       assert Indexer.posts_planned() == 1
@@ -468,38 +468,5 @@ defmodule DataplaneEx.IndexerTest do
       Indexer.vacuum()
       assert Indexer.posts_created() == 0
     end
-  end
-
-  defp users_csv(did1, did2, did3, did4) do
-    """
-    user_did,indexedAt,trustedVerifier
-    #{did1},20260303,false
-    #{did2},20260303,false
-    #{did3},20260303,false
-    #{did4},20260303,false
-    """
-  end
-
-  defp edges_csv(did1, did2, did3, did4) do
-    """
-    uri,cid,actor_did,subject_did
-    at://something,bayfreixx,#{did2},#{did1}
-    at://something,bayfreixx,#{did3},#{did1}
-    at://something,bayfreixx,#{did4},#{did1}
-    at://something,bayfreixx,#{did3},#{did2}
-    """
-  end
-
-  defp posts_csv(did1, did2) do
-    """
-    offset_ms,user_id
-    0,#{did1}
-    1000,#{did2}
-    5000,#{did1}
-    """
-  end
-
-  defp empty_posts_csv do
-    "offset_ms,user_id\n"
   end
 end

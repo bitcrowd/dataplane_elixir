@@ -1,6 +1,5 @@
 defmodule DataplaneExWeb.TimelineController do
   use DataplaneExWeb, :controller
-
   alias DataplaneEx.Server
 
   def timeline(conn, params) do

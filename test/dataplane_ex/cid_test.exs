@@ -1,6 +1,5 @@
 defmodule DataplaneEx.CIDTest do
   use ExUnit.Case, async: true
-
   alias DataplaneEx.CID
 
   test "casts DASL CID values from CBOR tag 42 links" do

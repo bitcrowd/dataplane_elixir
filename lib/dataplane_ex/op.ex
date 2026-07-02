@@ -1,8 +1,6 @@
 defmodule DataplaneEx.Op do
   use Ecto.Schema
-
   import Ecto.Changeset
-
   alias DataplaneEx.CID
 
   embedded_schema do
