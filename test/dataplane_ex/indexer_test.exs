@@ -102,8 +102,8 @@ defmodule DataplaneEx.IndexerTest do
       timeline_2 = Indexer.get_timeline("did:plc:firesim2")
       timeline_3 = Indexer.get_timeline("did:plc:firesim3")
 
-      assert length(timeline_2) == 2
-      assert length(timeline_3) == 3
+      assert [_, _] = timeline_2
+      assert [_, _, _] = timeline_3
     end
 
     test "accepts and ignores time_offset_ms option", %{posts_csv: posts_csv} do
@@ -186,9 +186,9 @@ defmodule DataplaneEx.IndexerTest do
 
       assert :ok = Indexer.create_post(%{user_id: did1})
 
-      assert length(Indexer.get_timeline(did2)) == 1
-      assert length(Indexer.get_timeline(did3)) == 1
-      assert length(Indexer.get_timeline(did4)) == 1
+      assert [_] = Indexer.get_timeline(did2)
+      assert [_] = Indexer.get_timeline(did3)
+      assert [_] = Indexer.get_timeline(did4)
     end
 
     test "returns :ok for user with no followers", %{
@@ -328,9 +328,9 @@ defmodule DataplaneEx.IndexerTest do
       Indexer.bulk_follows(edges_csv)
 
       Indexer.insert_post(Indexer.next_post_id(), did1)
-      assert length(Indexer.get_timeline(did2)) == 1
-      assert length(Indexer.get_timeline(did3)) == 1
-      assert length(Indexer.get_timeline(did4)) == 1
+      assert [_] = Indexer.get_timeline(did2)
+      assert [_] = Indexer.get_timeline(did3)
+      assert [_] = Indexer.get_timeline(did4)
     end
   end
 

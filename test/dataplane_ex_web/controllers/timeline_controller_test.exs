@@ -27,7 +27,7 @@ defmodule DataplaneExWeb.TimelineControllerTest do
     conn = post(conn, ~p"/bsky.Service/GetTimeline", actor_did: "did:plc:firesim3", limit: 2)
 
     assert %{"items" => items} = json_response(conn, 200)
-    assert length(items) == 2
+    assert [_, _] = items
     assert Enum.map(items, & &1["id"]) == Enum.sort(Enum.map(items, & &1["id"]), :desc)
   end
 

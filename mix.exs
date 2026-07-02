@@ -85,7 +85,6 @@ defmodule DataplaneEx.MixProject do
   defp aliases do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
-      test: ["test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind dataplane_ex", "esbuild dataplane_ex"],
       "assets.deploy": [

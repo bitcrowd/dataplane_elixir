@@ -24,14 +24,14 @@ defmodule DataplaneEx.ServerTest do
       Indexer.create_post(%{user_id: did2})
 
       {:ok, timeline} = Server.get_timeline({did3, 10, nil})
-      assert length(timeline) == 2
+      assert [_, _] = timeline
     end
 
     test "respects the limit parameter", %{did1: did1, did2: did2} do
       for _ <- 1..5, do: Indexer.create_post(%{user_id: did1})
 
       {:ok, timeline} = Server.get_timeline({did2, 3, nil})
-      assert length(timeline) == 3
+      assert [_, _, _] = timeline
     end
 
     test "returns empty list for user with no follows", %{did1: did1, did2: did2} do
