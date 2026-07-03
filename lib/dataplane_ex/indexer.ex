@@ -4,19 +4,27 @@ defmodule DataplaneEx.Indexer do
 
   Stores the social graph, posts, and feeds in six named ETS tables:
 
-    - `:social_graph_users`           — `:set` of `{user_id}`
+    - `:social_graph_users`            — `:set` of `{user_id}`
     - `:social_graph_followers`        — `:duplicate_bag` of `{subject_id, actor_id}`
     - `:social_graph_following`        — `:duplicate_bag` of `{actor_id, subject_id}`
-    - `:social_graph_posts`            — `:set` of `{post_id, author_id}` (`:public`, concurrent writes, concurrent reads)
-    - `:social_graph_feeds`            — `:duplicate_bag` of `{user_id, post_id}` (`:public`, concurrent writes)
-    - `:social_graph_celebrity_posts`  — `:duplicate_bag` of `{author_id, post_id}` (`:public`, concurrent writes)
+    - `:social_graph_posts`            — `:set` of `{post_id, author_id}`
+    - `:social_graph_feeds`            — `:duplicate_bag` of `{user_id, post_id}`
+    - `:social_graph_celebrity_posts`  — `:duplicate_bag` of `{author_id, post_id}`
 
-  The social graph tables are `:protected` (owner writes, everyone reads).
-  The posts table is `:public` with `write_concurrency: :auto` so that
-  Server workers can insert posts without going through the GenServer.
+  All tables except `:social_graph_users` are `:public` with read and write
+  concurrency enabled, so they can be written from any process. The users
+  table is `:protected` (only the Indexer writes, everyone reads).
+
+  Inserted posts are fanned out to the feeds of all the author's followers.
+  Authors with more followers than the `:fan_out_limit` option skip fan-out:
+  their posts go to the celebrity posts table instead and are merged into
+  timelines at read time.
 
   Post IDs are generated via an `:atomics` counter published in
   `:persistent_term` for lock-free access from any process.
+
+  The tables are owned by the Indexer process, so all indexed data is lost
+  and the tables are recreated empty when it restarts.
   """
   use GenServer
   alias DataplaneEx.Progress

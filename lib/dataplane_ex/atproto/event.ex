@@ -19,9 +19,6 @@ defmodule DataplaneEx.ATProto.Event do
       {:ok, [%{"t" => "#account"} | _rest] = event} ->
         decode_account(event)
 
-      {:ok, [%{"t" => "#error"} | _rest] = event} ->
-        decode_error(event)
-
       {:ok, [%{"op" => -1} | _rest] = event} ->
         decode_error(event)
 
