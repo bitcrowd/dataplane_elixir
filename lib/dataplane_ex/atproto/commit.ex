@@ -1,8 +1,6 @@
 defmodule DataplaneEx.ATProto.Commit do
-  import Ecto.Changeset
   use Ecto.Schema
-
-  alias DataplaneEx.ATProto.Commit
+  import Ecto.Changeset
 
   # spec: https://atproto.com/specs/sync#commit-events
   @primary_key false
@@ -24,14 +22,14 @@ defmodule DataplaneEx.ATProto.Commit do
   @attrs @required_attrs ++ [:since]
 
   @doc false
-  def changeset(%Commit{} = commit, attrs) do
+  def changeset(%__MODULE__{} = commit, attrs) do
     commit
     |> cast(attrs, @attrs)
     |> cast_embed(:ops, required: true)
     |> validate_required(@required_attrs)
   end
 
-  def to_event(%Commit{} = commit) do
+  def to_event(%__MODULE__{} = commit) do
     for op <- commit.ops do
       to_event(op, commit)
     end

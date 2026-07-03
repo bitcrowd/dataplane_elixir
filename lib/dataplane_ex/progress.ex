@@ -8,38 +8,10 @@ defmodule DataplaneEx.Progress do
   @print_interval_ms 1_000
 
   @doc """
-  Count data lines in a CSV file (excludes the header row).
-
-  Reads in 256 KB binary chunks and counts newline characters.
-  """
-  def count_lines(filepath) do
-    lines =
-      filepath
-      |> File.stream!(256 * 1024)
-      |> Enum.reduce(0, fn chunk, acc ->
-        acc + count_newlines(chunk)
-      end)
-
-    if lines > 0 do
-      lines - 1
-    else
-      0
-    end
-  end
-
-  defp count_newlines(<<>>), do: 0
-
-  defp count_newlines(binary) do
-    for <<byte <- binary>>, byte == ?\n, reduce: 0 do
-      acc -> acc + 1
-    end
-  end
-
-  @doc """
   Iterates `enumerable`, calling `fun` on each element while printing
   progress every ~1 second. Returns `:ok`.
 
-  `total` is the expected number of items (from `count_lines/1`).
+  `total` is the expected number of items (from `total_from_file/1`).
   `label` is a short string printed as the operation name.
 
   ## Options
@@ -47,6 +19,13 @@ defmodule DataplaneEx.Progress do
     - `:step` — count increment per element (default `1`). Use this when
       iterating batches but tracking individual row counts.
   """
+  @spec each_with_progress(
+          Enumerable.t(),
+          non_neg_integer(),
+          String.t(),
+          (term() -> any()),
+          keyword()
+        ) :: :ok
   def each_with_progress(enumerable, total, label, fun, opts \\ []) do
     step = Keyword.get(opts, :step, 1)
     started_at = System.monotonic_time(:millisecond)
@@ -74,7 +53,7 @@ defmodule DataplaneEx.Progress do
   defp print_progress(label, count, 0, started_at, now) do
     elapsed = now - started_at
     rate = rate_string(count, elapsed)
-    Logger.info("\r\e[2K#{label}: #{format_number(count)} rows — #{rate}")
+    Logger.info("#{label}: #{format_number(count)} rows — #{rate}")
   end
 
   defp print_progress(label, count, total, started_at, now) do
@@ -91,7 +70,7 @@ defmodule DataplaneEx.Progress do
       end
 
     Logger.info(
-      "\r\e[2K#{label}: #{format_number(count)} / #{format_number(total)} (#{pct}%) — #{rate}#{eta}"
+      "#{label}: #{format_number(count)} / #{format_number(total)} (#{pct}%) — #{rate}#{eta}"
     )
   end
 
@@ -99,9 +78,7 @@ defmodule DataplaneEx.Progress do
     elapsed = System.monotonic_time(:millisecond) - started_at
     rate = rate_string(count, elapsed)
 
-    Logger.info(
-      "\r\e[2K#{label}: #{format_number(count)} rows — #{rate} — #{format_duration(elapsed)}\n"
-    )
+    Logger.info("#{label}: #{format_number(count)} rows — #{rate} — #{format_duration(elapsed)}")
   end
 
   defp rate_string(_count, elapsed) when elapsed <= 0, do: "—"
@@ -144,28 +121,37 @@ defmodule DataplaneEx.Progress do
     "#{minutes}m #{seconds}s"
   end
 
+  @spec total_from_file(Path.t()) :: non_neg_integer()
   def total_from_file(path) do
     DataplaneEx.CSV.read_meta(path)[:total] || count_lines(path)
   end
 
+  @spec total_from_source(Enumerable.t() | String.t(), keyword()) :: non_neg_integer()
   def total_from_source(source, opts) when is_binary(source) do
-    Keyword.get_lazy(opts, :total, fn -> line_count(source) end)
+    Keyword.get_lazy(opts, :total, fn -> data_row_count([source]) end)
   end
 
   def total_from_source(_source, opts) do
     Keyword.get(opts, :total, 0)
   end
 
-  def line_count(contents) do
-    lines =
-      contents
-      |> String.split("\n", trim: true)
-      |> length()
+  defp count_lines(filepath) do
+    filepath
+    |> File.stream!(256 * 1024)
+    |> data_row_count()
+  end
 
-    if lines > 0 do
-      lines - 1
-    else
-      0
+  defp data_row_count(chunks) do
+    newlines = Enum.reduce(chunks, 0, fn chunk, acc -> acc + count_newlines(chunk) end)
+
+    max(newlines - 1, 0)
+  end
+
+  defp count_newlines(<<>>), do: 0
+
+  defp count_newlines(binary) do
+    for <<byte <- binary>>, byte == ?\n, reduce: 0 do
+      acc -> acc + 1
     end
   end
 end

@@ -1,8 +1,6 @@
 defmodule DataplaneEx.ATProto.Account do
-  import Ecto.Changeset
   use Ecto.Schema
-
-  alias DataplaneEx.ATProto.Account
+  import Ecto.Changeset
 
   # spec: https://atproto.com/specs/sync#account-events
   @primary_key false
@@ -19,13 +17,13 @@ defmodule DataplaneEx.ATProto.Account do
   @attrs @required_attrs ++ [:status]
 
   @doc false
-  def changeset(%Account{} = account, attrs) do
+  def changeset(%__MODULE__{} = account, attrs) do
     account
     |> cast(attrs, @attrs)
     |> validate_required(@required_attrs)
   end
 
-  def to_event(%Account{} = account) do
+  def to_event(%__MODULE__{} = account) do
     %{did: did, seq: seq, active: active, time: time} = account
 
     kind = :account

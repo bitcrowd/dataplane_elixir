@@ -1,6 +1,6 @@
 defmodule DataplaneEx.ServerTest do
   use ExUnit.Case, async: false
-
+  import DataplaneEx.CSVFixtures
   alias DataplaneEx.Server
   alias DataplaneEx.Indexer
 
@@ -13,7 +13,7 @@ defmodule DataplaneEx.ServerTest do
     start_supervised!(Indexer)
 
     Indexer.bulk_users(users_csv(did1, did2, did3, did4))
-    Indexer.bulk_follows(edges_csv(did1, did2, did3, did4))
+    Indexer.bulk_follows(follows_csv(did1, did2, did3, did4))
 
     %{did1: did1, did2: did2, did3: did3, did4: did4}
   end
@@ -24,14 +24,14 @@ defmodule DataplaneEx.ServerTest do
       Indexer.create_post(%{user_id: did2})
 
       {:ok, timeline} = Server.get_timeline({did3, 10, nil})
-      assert length(timeline) == 2
+      assert [_, _] = timeline
     end
 
     test "respects the limit parameter", %{did1: did1, did2: did2} do
       for _ <- 1..5, do: Indexer.create_post(%{user_id: did1})
 
       {:ok, timeline} = Server.get_timeline({did2, 3, nil})
-      assert length(timeline) == 3
+      assert [_, _, _] = timeline
     end
 
     test "returns empty list for user with no follows", %{did1: did1, did2: did2} do
@@ -56,25 +56,5 @@ defmodule DataplaneEx.ServerTest do
 
       assert ids == Enum.sort(ids, :desc)
     end
-  end
-
-  defp users_csv(did1, did2, did3, did4) do
-    """
-    user_did,indexedAt,trustedVerifier
-    #{did1},20260303,false
-    #{did2},20260303,false
-    #{did3},20260303,false
-    #{did4},20260303,false
-    """
-  end
-
-  defp edges_csv(did1, did2, did3, did4) do
-    """
-    uri,cid,actor_did,subject_did
-    at://something,bayfreixx,#{did2},#{did1}
-    at://something,bayfreixx,#{did3},#{did1}
-    at://something,bayfreixx,#{did4},#{did1}
-    at://something,bayfreixx,#{did3},#{did2}
-    """
   end
 end

@@ -7,6 +7,10 @@ defmodule DataplaneEx.CSV do
   to load it and `write_meta/2` to create one alongside a CSV.
   """
 
+  alias NimbleCSV.RFC4180, as: Parser
+
+  @type source :: String.t() | Enumerable.t()
+
   @doc """
   Reads the `.meta` companion file for `csv_path`.
   """
@@ -51,72 +55,50 @@ defmodule DataplaneEx.CSV do
   @doc """
   Parses a user CSV into a stream of user IDs.
   """
-  @spec parse_users(String.t()) :: Enumerable.t()
-  def parse_users(content) when is_binary(content) do
-    content
-    |> String.splitter("\n", trim: false)
-    |> parse_users()
-  end
-
-  @spec parse_users(Enumerable.t()) :: Enumerable.t()
+  @spec parse_users(source()) :: Enumerable.t()
   def parse_users(source) do
     source
-    |> Stream.drop(1)
-    |> Stream.map(&String.trim/1)
-    |> Stream.reject(&(&1 == ""))
-    |> Stream.map(fn line ->
-      [user_did, _indexed_at, _trusted_verifier] = String.split(line, ",", parts: 3)
-
-      remove_quotes(user_did)
-    end)
+    |> parse()
+    |> Stream.map(fn [user_did | _rest] -> user_did end)
   end
 
   @doc """
   Parses an edges CSV into a stream of tuples.
   """
-  @spec parse_edges(String.t()) :: Enumerable.t()
-  def parse_edges(content) when is_binary(content) do
-    content
-    |> String.splitter("\n", trim: false)
-    |> parse_edges()
-  end
-
-  @spec parse_edges(Enumerable.t()) :: Enumerable.t()
+  @spec parse_edges(source()) :: Enumerable.t()
   def parse_edges(source) do
     source
-    |> Stream.drop(1)
-    |> Stream.map(&String.trim/1)
-    |> Stream.reject(&(&1 == ""))
-    |> Stream.map(fn line ->
-      [_uri, _cid, actor_did, subject_did | _rest] = String.split(line, ",")
-
-      {remove_quotes(actor_did), remove_quotes(subject_did)}
+    |> parse()
+    |> Stream.map(fn [_uri, _cid, actor_did, subject_did | _rest] ->
+      {actor_did, subject_did}
     end)
   end
 
   @doc """
   Parses a posts CSV into a stream of `{offset_ms, user_id}` tuples.
   """
-  @spec parse_posts(String.t()) :: Enumerable.t()
-  def parse_posts(content) when is_binary(content) do
-    content
-    |> String.splitter("\n", trim: false)
-    |> parse_posts()
-  end
-
-  @spec parse_posts(Enumerable.t()) :: Enumerable.t()
+  @spec parse_posts(source()) :: Enumerable.t()
   def parse_posts(source) do
     source
-    |> Stream.drop(1)
-    |> Stream.map(&String.trim/1)
-    |> Stream.reject(&(&1 == ""))
-    |> Stream.map(fn line ->
-      [offset_ms, user_id] = line |> String.split(",")
+    |> parse()
+    |> Stream.map(fn [offset_ms, user_id | _rest] ->
       {String.to_integer(offset_ms), user_id}
     end)
   end
 
-  defp remove_quotes(id) do
-    String.trim(id, "\"")
+  defp parse(content) when is_binary(content) do
+    content
+    |> Parser.parse_string(skip_headers: true)
+    |> reject_blank_rows()
+  end
+
+  defp parse(source) do
+    source
+    |> Parser.parse_stream(skip_headers: true)
+    |> reject_blank_rows()
+  end
+
+  defp reject_blank_rows(rows) do
+    Stream.reject(rows, &(&1 == [""]))
   end
 end

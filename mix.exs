@@ -67,11 +67,13 @@ defmodule DataplaneEx.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
+      {:nimble_csv, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:canonical_tailwind, "~> 0.1.0", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -84,7 +86,6 @@ defmodule DataplaneEx.MixProject do
   defp aliases do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
-      test: ["test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind dataplane_ex", "esbuild dataplane_ex"],
       "assets.deploy": [
@@ -93,6 +94,7 @@ defmodule DataplaneEx.MixProject do
         "phx.digest"
       ],
       precommit: [
+        "hex.audit",
         "compile --warnings-as-errors",
         "dialyzer",
         "deps.unlock --unused",

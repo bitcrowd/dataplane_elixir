@@ -1,6 +1,5 @@
 defmodule DataplaneEx.CARTest do
   use ExUnit.Case, async: true
-
   alias DataplaneEx.CAR
 
   test "casts CBOR byte payloads into decoded DASL DRISL CARs" do

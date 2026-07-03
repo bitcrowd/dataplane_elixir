@@ -32,17 +32,17 @@ defmodule DataplaneEx.Application do
     :ok
   end
 
-  def indexer() do
+  defp indexer do
     if Application.get_env(:dataplane_ex, :start_indexer, true), do: DataplaneEx.Indexer
   end
 
-  def sync_client() do
+  defp sync_client do
     if url = relay_url() do
       {DataplaneEx.SyncClient, uri: "#{url}/xrpc/com.atproto.sync.subscribeRepos", name: :sync}
     end
   end
 
-  def relay_url() do
+  defp relay_url do
     Application.get_env(:dataplane_ex, :bsky_relay_websocket, nil)
   end
 end

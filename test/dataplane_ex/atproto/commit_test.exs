@@ -1,6 +1,5 @@
 defmodule DataplaneEx.ATProto.CommitTest do
   use ExUnit.Case, async: true
-
   alias DataplaneEx.ATProto.Commit
   alias DataplaneEx.Op
 

@@ -4,11 +4,10 @@ defmodule DataplaneEx.SyncClient do
   """
 
   use WebSockex
-
   alias Phoenix.PubSub
-
   require Logger
 
+  @spec start_link(keyword()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     uri = Keyword.fetch!(opts, :uri)
     name = Keyword.fetch!(opts, :name)
