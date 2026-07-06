@@ -81,7 +81,7 @@ defmodule DataplaneEx.MixProject do
         "compile --warnings-as-errors",
         "dialyzer",
         "deps.unlock --unused",
-        "format",
+        "format --check-formatted",
         "credo --all",
         "test"
       ]
