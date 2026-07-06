@@ -1,8 +1,8 @@
 defmodule DataplaneEx.ServerTest do
   use ExUnit.Case, async: false
   import DataplaneEx.CSVFixtures
-  alias DataplaneEx.Server
   alias DataplaneEx.Indexer
+  alias DataplaneEx.Server
 
   setup do
     did1 = "did:plc:firesim1"

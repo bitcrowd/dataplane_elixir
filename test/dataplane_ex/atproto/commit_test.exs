@@ -1,5 +1,6 @@
 defmodule DataplaneEx.ATProto.CommitTest do
   use ExUnit.Case, async: true
+  alias DASL.CAR.DRISL
   alias DataplaneEx.ATProto.Commit
   alias DataplaneEx.Op
 
@@ -11,7 +12,7 @@ defmodule DataplaneEx.ATProto.CommitTest do
       "ignored" => "not included"
     }
 
-    {:ok, {blocks, cid}} = DASL.CAR.DRISL.add_block(%DASL.CAR.DRISL{}, record)
+    {:ok, {blocks, cid}} = DRISL.add_block(%DRISL{}, record)
 
     commit = %Commit{
       repo: "did:plc:alice",

@@ -82,7 +82,7 @@ defmodule DataplaneEx.MixProject do
         "dialyzer",
         "deps.unlock --unused",
         "format --check-formatted",
-        "credo --all",
+        "credo --all --strict",
         "test"
       ]
     ]
