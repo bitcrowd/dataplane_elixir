@@ -37,19 +37,26 @@ at://did:plc:bob/app.bsky.graph.follow/1,bafyre...,did:plc:bob,did:plc:alice
 
 Load users before follows, because follows reference existing users.
 
-Start with IEx:
+In development, start IEx and run:
 
 ```sh
 MIX_ENV=prod iex -S mix phx.server
 ```
-
-Then run:
 
 ```elixir
 alias DataplaneEx.Indexer
 
 Indexer.bulk_users_from_file("/path/to/users.csv")
 Indexer.bulk_follows_from_file("/path/to/follows.csv")
+```
+
+When running via a release (e.g. Docker), copy the CSV files into the
+container and attach with `remote`, then run the same commands:
+
+```sh
+docker cp users.csv   <container>:/tmp/users.csv
+docker cp follows.csv <container>:/tmp/follows.csv
+docker exec -it <container> bin/dataplane_ex remote
 ```
 
 To delete all loaded data:
