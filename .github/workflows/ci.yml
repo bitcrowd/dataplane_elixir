@@ -43,7 +43,7 @@ jobs:
       - name: Install deps
         run: mix deps.get
 
-      - name: "Hex Audit"
+      - name: Hex Audit
         run: mix hex.audit
 
       - name: Compile
