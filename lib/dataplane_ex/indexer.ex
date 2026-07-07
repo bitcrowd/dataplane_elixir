@@ -27,6 +27,7 @@ defmodule DataplaneEx.Indexer do
   and the tables are recreated empty when it restarts.
   """
   use GenServer
+  alias DataplaneEx.ATProto.Event
   alias DataplaneEx.Progress
   require Logger
 
@@ -350,7 +351,7 @@ defmodule DataplaneEx.Indexer do
   def handle_info({:binary, binary}, state) do
     events =
       binary
-      |> DataplaneEx.ATProto.Event.decode()
+      |> Event.decode()
       |> List.wrap()
 
     Enum.each(events, &index_event/1)
