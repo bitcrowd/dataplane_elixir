@@ -16,11 +16,7 @@ config :dataplane_ex, DataplaneExWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "otE3oXHFhM5dMjFX9xxSqybPlnepB4fQVcnXZM+CKxvET9wI/NLxVScj5SZdk9Ex",
-  watchers: [
-    esbuild: {Esbuild, :install_and_run, [:dataplane_ex, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:dataplane_ex, ~w(--watch)]}
-  ]
+  secret_key_base: "otE3oXHFhM5dMjFX9xxSqybPlnepB4fQVcnXZM+CKxvET9wI/NLxVScj5SZdk9Ex"
 
 # ## SSL Support
 #
@@ -50,9 +46,6 @@ config :dataplane_ex, DataplaneExWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
-      # Static assets, except user uploads
-      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
-      # Router, Controllers, LiveViews and LiveComponents
       ~r"lib/dataplane_ex_web/router\.ex$"E,
       ~r"lib/dataplane_ex_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
