@@ -15,8 +15,24 @@ defmodule DataplaneEx.CIDTest do
     assert CID.load(cid.bytes) == {:ok, cid}
   end
 
+  test "loads an already-decoded DASL CID struct unchanged" do
+    cid = DASL.CID.compute("hello world", :drisl)
+
+    assert CID.load(cid) == {:ok, cid}
+  end
+
+  test "casts an already-decoded DASL CID struct unchanged" do
+    cid = DASL.CID.compute("hello world", :drisl)
+
+    assert CID.cast(cid) == {:ok, cid}
+  end
+
   test "rejects invalid CID payloads" do
     assert CID.cast(%CBOR.Tag{tag: 1, value: "not a cid"}) == :error
     assert CID.load("not a cid") == :error
+  end
+
+  test "type/0 returns :binary" do
+    assert CID.type() == :binary
   end
 end

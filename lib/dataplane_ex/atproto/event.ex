@@ -32,9 +32,7 @@ defmodule DataplaneEx.ATProto.Event do
     end
   end
 
-  defp decode("", decoded_acc) do
-    {:ok, Enum.reverse(decoded_acc)}
-  end
+  defp decode("", decoded_acc), do: {:ok, Enum.reverse(decoded_acc)}
 
   defp decode(binary, decoded_acc) do
     case CBOR.decode(binary) do

@@ -1,0 +1,7 @@
+{
+  "skip_files": [
+    "lib/dataplane_ex.ex",
+    "lib/dataplane_ex_web.ex",
+    "lib/dataplane_ex_web/endpoint.ex"
+  ]
+}
