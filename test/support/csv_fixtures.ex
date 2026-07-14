@@ -33,4 +33,10 @@ defmodule DataplaneEx.CSVFixtures do
   def empty_posts_csv do
     "offset_ms,user_id\n"
   end
+
+  @doc "Returns a CSV path inside `dir`."
+  def csv_path(temp_dir), do: Path.join(temp_dir, "data.csv")
+
+  @doc "Returns the `.meta` companion path for `csv_path`."
+  def csv_meta_path(csv_path), do: Path.rootname(csv_path) <> ".meta"
 end
