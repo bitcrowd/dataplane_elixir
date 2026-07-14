@@ -16,7 +16,15 @@ defmodule DataplaneEx.MixProject do
         plt_add_apps: [:ex_unit, :mix]
       ],
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ]
     ]
   end
 
@@ -63,7 +71,8 @@ defmodule DataplaneEx.MixProject do
       {:bandit, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 

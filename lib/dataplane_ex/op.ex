@@ -3,13 +3,13 @@ defmodule DataplaneEx.Op do
   import Ecto.Changeset
   alias DataplaneEx.CID
 
+  @attrs [:action, :cid, :path]
+
   embedded_schema do
     field :action, :string
     field :cid, CID
     field :path, :string
   end
-
-  @attrs [:action, :cid, :path]
 
   def changeset(%__MODULE__{} = op, attrs) do
     changeset = cast(op, attrs, @attrs)

@@ -1,9 +1,15 @@
 defmodule DataplaneEx.ATProto.Account do
+  @moduledoc false
+
   use Ecto.Schema
   import Ecto.Changeset
 
   # spec: https://atproto.com/specs/sync#account-events
   @primary_key false
+
+  @required_attrs [:seq, :did, :time, :active]
+  @attrs @required_attrs ++ [:status]
+
   embedded_schema do
     field :seq, :integer
     field :did, :string
@@ -12,11 +18,6 @@ defmodule DataplaneEx.ATProto.Account do
     field :status, Ecto.Enum, values: [:takendown, :suspended, :deleted, :deactivated]
   end
 
-  @required_attrs [:seq, :did, :time, :active]
-
-  @attrs @required_attrs ++ [:status]
-
-  @doc false
   def changeset(%__MODULE__{} = account, attrs) do
     account
     |> cast(attrs, @attrs)
@@ -26,13 +27,10 @@ defmodule DataplaneEx.ATProto.Account do
   def to_event(%__MODULE__{} = account) do
     %{did: did, seq: seq, active: active, time: time} = account
 
-    kind = :account
-    event_time = DateTime.utc_now() |> DateTime.to_unix(:microsecond)
-
     %{
       did: did,
-      time_us: event_time,
-      kind: kind,
+      time_us: DateTime.utc_now() |> DateTime.to_unix(:microsecond),
+      kind: :account,
       account: %{
         active: active,
         did: did,

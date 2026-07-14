@@ -1,5 +1,6 @@
 defmodule DataplaneEx.CSVTest do
   use ExUnit.Case, async: true
+  import DataplaneEx.CSVFixtures
   alias DataplaneEx.CSV
 
   test "parse_users/1 returns user DIDs and unquotes fields" do
@@ -46,5 +47,28 @@ defmodule DataplaneEx.CSVTest do
     """
 
     assert Enum.to_list(CSV.parse_posts(csv)) == [{0, "did:plc:alice"}, {1000, "did:plc:bob"}]
+  end
+
+  describe "read_meta/1 and write_meta/2" do
+    @describetag :tmp_dir
+
+    test "round-trips metadata through a companion .meta file", %{tmp_dir: tmp_dir} do
+      path = csv_path(tmp_dir)
+
+      assert :ok = CSV.write_meta(path, %{total: 42})
+      assert CSV.read_meta(path) == %{total: 42}
+    end
+
+    test "returns an empty map when no .meta file exists", %{tmp_dir: tmp_dir} do
+      assert CSV.read_meta(csv_path(tmp_dir)) == %{}
+    end
+
+    test "ignores malformed lines in a .meta file", %{tmp_dir: tmp_dir} do
+      path = csv_path(tmp_dir)
+
+      File.write!(csv_meta_path(path), "total: 42\nmalformed line without colon\n")
+
+      assert CSV.read_meta(path) == %{total: 42}
+    end
   end
 end

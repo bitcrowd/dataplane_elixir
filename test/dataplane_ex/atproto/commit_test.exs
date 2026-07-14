@@ -20,9 +20,9 @@ defmodule DataplaneEx.ATProto.CommitTest do
       blocks: blocks,
       ops: [
         %Op{
-          action: "create",
           cid: cid,
-          path: "app.bsky.feed.post/abc123"
+          path: "app.bsky.feed.post/abc123",
+          action: "create"
         }
       ]
     }
@@ -42,5 +42,23 @@ defmodule DataplaneEx.ATProto.CommitTest do
              "createdAt" => "2026-05-19T12:00:00.000Z",
              "subject" => %{"uri" => "at://did:plc:alice/app.bsky.feed.post/root"}
            }
+  end
+
+  test "to_event/1 handles delete ops without reading blocks" do
+    commit = %Commit{
+      repo: "did:plc:alice",
+      rev: "3lxyz",
+      ops: [%Op{action: "delete", path: "app.bsky.feed.post/abc123"}]
+    }
+
+    [event] = Commit.to_event(commit)
+
+    assert event.did == "did:plc:alice"
+    assert event.kind == :commit
+    assert event.commit.operation == "delete"
+    assert event.commit.collection == "app.bsky.feed.post"
+    assert event.commit.rkey == "abc123"
+
+    refute Map.has_key?(event.commit, :cid)
   end
 end
